@@ -1,0 +1,64 @@
+appId: com.anuboost.project-monitor
+productName: Project Monitor
+
+# node-pty ships prebuilt N-API binaries for every platform this app targets
+# — see the note in electron-builder.win.yml. Skip the automatic native
+# rebuild here too, for consistency across platforms.
+npmRebuild: false
+
+asar: true
+asarUnpack:
+  - node_modules/node-pty/**/*
+
+directories:
+  output: release/linux
+
+publish:
+  provider: github
+  owner: Anuboost-Long
+  repo: project-monitor
+  releaseType: release
+
+files:
+  - dist/**/*
+  - dist-electron/**/*
+  - node_modules/**/*
+  - package.json
+
+linux:
+  # A single 1024px PNG — electron-builder wants a directory of square PNGs
+  # per size for a full hicolor theme, and warns without one. Acceptable for
+  # now; revisit if that warning becomes a real problem.
+  icon: assets/icons/icon.png
+  category: Development
+  synopsis: Monitor local project commands, terminal output, and captured errors
+  description: >-
+    Project Monitor watches local project commands, terminal output, and
+    captured errors from one desktop workspace.
+  desktop:
+    entry:
+      StartupWMClass: Project Monitor
+      Keywords: developer;terminal;monitoring;
+  artifactName: ${productName}-${arch}.${ext}
+  target:
+    - target: AppImage
+      arch:
+        - x64
+    - target: deb
+      arch:
+        - x64
+
+appImage:
+  artifactName: ${productName}-${arch}.${ext}
+
+deb:
+  artifactName: ${productName}-${arch}.${ext}
+  depends:
+    - libgtk-3-0
+    - libnotify4
+    - libnss3
+    - libxss1
+    - libxtst6
+    - xdg-utils
+    - libatspi2.0-0
+    - libsecret-1-0

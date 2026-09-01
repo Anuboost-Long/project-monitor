@@ -1,0 +1,48 @@
+appId: com.anuboost.project-monitor
+productName: Project Monitor
+
+# node-pty ships prebuilt N-API binaries (ABI-stable across Node/Electron) for
+# every platform this app targets. Rebuilding it from source here hits an
+# unrelated winpty build-script bug (GetCommitHash.bat), so native rebuilds
+# are skipped entirely in favor of the bundled prebuilds.
+npmRebuild: false
+
+# Native modules must be unpacked from asar so Windows can load the .node binary
+asar: true
+asarUnpack:
+  - node_modules/node-pty/**/*
+
+directories:
+  output: release/win
+
+publish:
+  provider: github
+  owner: Anuboost-Long
+  repo: project-monitor
+  releaseType: release
+
+files:
+  - dist/**/*
+  - dist-electron/**/*
+  - node_modules/**/*
+  - package.json
+
+win:
+  icon: assets/icons/icon.ico
+  artifactName: ${productName}-Setup-${arch}.${ext}
+  target:
+    - target: nsis
+      arch:
+        - x64
+
+nsis:
+  # User-facing installer — not a silent one-click install
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Project Monitor
+  installerIcon: assets/icons/icon.ico
+  uninstallerIcon: assets/icons/icon.ico
+  allowElevation: true
+  perMachine: false

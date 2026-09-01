@@ -1,0 +1,60 @@
+appId: com.anuboost.project-monitor
+productName: Project Monitor
+
+# node-pty ships prebuilt N-API binaries for every platform this app targets
+# — see the note in electron-builder.win.yml. Skip the automatic native
+# rebuild here too, for consistency across platforms.
+npmRebuild: false
+
+# Native modules must be unpacked from asar so the OS can load them directly
+asar: true
+asarUnpack:
+  - node_modules/node-pty/**/*
+
+directories:
+  output: release/mac
+
+publish:
+  provider: github
+  owner: Anuboost-Long
+  repo: project-monitor
+  releaseType: release
+
+# Ad-hoc signs the packaged app — see src/scripts/mac-adhoc-sign.mjs for why.
+afterPack: ./src/scripts/mac-after-pack.mjs
+
+files:
+  - dist/**/*
+  - dist-electron/**/*
+  - node_modules/**/*
+  - package.json
+
+mac:
+  icon: assets/icons/icon.icns
+  category: public.app-category.developer-tools
+  artifactName: ${productName}-${arch}.${ext}
+  # No Developer ID Application certificate to sign with. Auto-discovery
+  # would fall back to an Apple Development certificate that only validates
+  # on Macs provisioned for the team, so every other Mac reports the
+  # download as "damaged". Turning discovery off and ad-hoc signing in
+  # afterPack downgrades that to the approvable "unidentified developer"
+  # prompt instead.
+  identity: null
+  entitlements: assets/entitlements.mac.plist
+  entitlementsInherit: assets/entitlements.mac.plist
+  target:
+    - target: dmg
+      arch:
+        - arm64
+        - x64
+    - target: zip
+      arch:
+        - arm64
+        - x64
+
+dmg:
+  artifactName: ${productName}-${arch}.${ext}
+  title: Project Monitor ${version} (${arch})
+  window:
+    width: 540
+    height: 380

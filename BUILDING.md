@@ -1,13 +1,20 @@
 # Building Project Monitor
 
-Project Monitor uses Electron Forge and must be built on the operating system being targeted. The GitHub Actions workflow builds both platforms on native runners.
+Project Monitor packages with [electron-builder](https://www.electron.build/)
+and must be built on the operating system being targeted. The GitHub Actions
+workflow builds all three platforms on native runners.
 
 ## Requirements
 
 - Node.js 22 LTS
 - npm
 - macOS with Xcode Command Line Tools for macOS builds
-- Windows 10 or 11 for Squirrel.Windows builds
+- Windows 10 or 11 for the NSIS installer build
+- Linux (glibc-based) for the AppImage/deb build
+
+No separate installer toolchain is required — electron-builder bundles its
+own NSIS compiler on Windows, unlike the previous Electron Forge + WiX
+Toolset setup, which needed `candle.exe`/`light.exe` installed separately.
 
 Install the locked dependencies and verify the project:
 
@@ -23,71 +30,73 @@ Build the installer for a platform:
 ```bash
 npm run package:mac
 npm run package:win
+npm run package:linux
 ```
 
-Each writes the finished installer to `out/make`:
+Each writes the finished installer to `release/<platform>`:
 
 ```text
-out/make/Project Monitor-<version>-arm64.dmg
-out/make/zip/darwin/arm64/Project Monitor-darwin-arm64-<version>.zip
-out/make/squirrel.windows/x64/ProjectMonitorSetup.exe
+release/mac/Project Monitor-arm64.dmg
+release/win/Project Monitor-Setup-x64.exe
+release/linux/Project Monitor-x64.AppImage
 ```
 
-`package:mac` builds for `arm64` only, because the app ships a rebuilt
-`node-pty` binary and a thin build keeps the disk image honest about what it
-runs on. `make:mac` and `make:win` are the same builds under Forge's own
-command names, and the CI workflow calls those.
+`package:mac` builds both `arm64` and `x64` targets — the app ships a
+prebuilt `node-pty` binary, and node-pty's native module is
+platform/architecture-specific, so a Windows or Linux build cannot be
+produced on macOS (and vice versa) — the same reason the CI workflow gives
+each platform its own runner.
 
-`package:win` only runs on Windows. `node-pty` is a native module compiled by
-node-gyp against the host toolchain, so a Windows build started on macOS fails
-in the rebuild step before it ever reaches the installer — the same reason the
-workflow gives each platform its own runner.
-
-To build only the unpacked application for the current machine, without an
-installer:
+## Development
 
 ```bash
-npm run package
+npm run dev
 ```
 
-Forge writes the unpacked application to `out/`.
+Runs the Vite dev server for the renderer, watch-builds the main and
+preload processes, and launches Electron against them (auto-restarting the
+main process on change via `electronmon`).
 
 ## Application icons
 
 The build uses the branded icons stored in `assets/icons`:
 
 - `icon.icns` for macOS
-- `icon.ico` for Windows and the Squirrel installer
-- `icon.png` as the 1024 px master
+- `icon.ico` for Windows and the NSIS installer
+- `icon.png` for Linux and as the 1024 px master
 
-These are the dark container artwork. The sidebar mark inside the application uses `mark-dark.png` for the default theme and `mark-light.png` for the company and lazify themes.
+These are the dark container artwork. The sidebar mark inside the application
+uses `mark-dark.png` for the default theme and `mark-light.png` for the
+company and lazify themes.
 
-## macOS signing and notarization
+## macOS signing
 
-Local macOS builds are ad-hoc signed without environment variables so their bundle integrity remains valid. Signing uses `assets/entitlements.mac.plist`, which turns off the hardened runtime's library validation — an ad-hoc bundle carries no Team ID, and without that entitlement macOS refuses to load Electron Framework into the app and it dies in dyld before its first window. For public distribution, install a Developer ID Application certificate in the build machine's keychain and provide:
-
-```text
-MAC_SIGN_IDENTITY=Developer ID Application: Name (TEAMID)
-APPLE_ID=developer@example.com
-APPLE_APP_SPECIFIC_PASSWORD=app-specific-password
-APPLE_TEAM_ID=TEAMID
-```
-
-Forge signs and notarizes during the Package step when these values are available. Keep them in the local environment or encrypted CI secrets, never in the repository.
+Local and CI macOS builds are ad-hoc signed (see
+`src/scripts/mac-adhoc-sign.mjs`), which is enough for the app to launch
+under Gatekeeper's "unidentified developer" prompt. There is currently no
+Developer ID Application certificate wired up for real signing or
+notarization. To add one later, set electron-builder's standard signing
+env vars (`CSC_LINK` pointing at a `.p12`, plus `CSC_KEY_PASSWORD`) and
+`APPLE_ID` / `APPLE_APP_SPECIFIC_PASSWORD` / `APPLE_TEAM_ID` for
+notarization, and drop the `identity: null` line from
+`electron-builder.mac.yml`.
 
 ## Windows signing
 
-Unsigned Squirrel.Windows builds work without environment variables. To sign with a PFX certificate, provide:
+Unsigned NSIS builds work without environment variables. To sign with a PFX
+certificate, provide electron-builder's standard variables:
 
 ```text
-WINDOWS_CERTIFICATE_FILE=C:\\secure\\project-monitor.pfx
-WINDOWS_CERTIFICATE_PASSWORD=certificate-password
+CSC_LINK=C:\\secure\\project-monitor.pfx
+CSC_KEY_PASSWORD=certificate-password
 ```
 
-Forge signs the Windows installer during the Make step. Keep the certificate outside the repository and store its password as a protected secret.
+electron-builder signs the installer automatically when these are present —
+no config changes needed.
 
 ## Automated builds
 
-The `Build desktop apps` workflow runs for version tags such as `v1.0.0` and can also be started manually from GitHub Actions. It builds macOS and Windows artifacts separately and uploads each platform's `out/make` output as a workflow artifact.
-
-To publish a GitHub release instead of workflow artifacts, run `npm run publish:mac` or `npm run publish:win` with `GITHUB_TOKEN` set; Forge uploads the same artifacts to a release on this repository.
+The `Build desktop apps` workflow runs for version tags such as `v1.0.0` and
+can also be started manually from GitHub Actions. It builds macOS, Windows,
+and Linux artifacts on their native runners and publishes them straight to
+a GitHub release on this repository.

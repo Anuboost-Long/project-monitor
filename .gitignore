@@ -88,9 +88,14 @@ typings/
 # Vite
 .vite/
 dist/
+dist-electron/
 
-# Electron-Forge
+# Electron-Forge (legacy, no longer produced)
 out/
+
+# electron-builder
+release/
+
 .lazify/
 
 # Signing credentials and logs

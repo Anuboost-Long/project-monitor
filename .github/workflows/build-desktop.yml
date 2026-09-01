@@ -7,7 +7,7 @@ on:
    - "v*"
 
 permissions:
- contents: read
+ contents: write
 
 jobs:
  build:
@@ -17,13 +17,14 @@ jobs:
    matrix:
     include:
      - name: macOS
-       os: macos-latest
-       command: npm run make:mac
-       artifact: project-monitor-macos
+       os: macos-14
+       config: electron-builder.mac.yml
      - name: Windows
        os: windows-latest
-       command: npm run make:win
-       artifact: project-monitor-windows
+       config: electron-builder.win.yml
+     - name: Linux
+       os: ubuntu-22.04
+       config: electron-builder.linux.yml
 
   runs-on: ${{ matrix.os }}
 
@@ -43,12 +44,10 @@ jobs:
    - name: Verify source
      run: npm run verify
 
-   - name: Build distributables
-     run: ${{ matrix.command }}
+   - name: Build application
+     run: npm run build
 
-   - name: Upload artifacts
-     uses: actions/upload-artifact@v4
-     with:
-      name: ${{ matrix.artifact }}
-      path: out/make/**/*
-      if-no-files-found: error
+   - name: Publish to this repository's releases
+     run: npx electron-builder --config ${{ matrix.config }} --publish always
+     env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

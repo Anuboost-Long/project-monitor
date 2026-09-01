@@ -1,15 +1,9 @@
 import path from "node:path";
 
 import { app, BrowserWindow, ipcMain } from "electron";
-import started from "electron-squirrel-startup";
 
 import { registerProjectMonitorIpc } from "./main/project-monitor-ipc";
 import { closeSplash, showSplash } from "./main/splash";
-
-// Handle creating/removing shortcuts on Windows when installing/uninstalling.
-if (started) {
-	app.quit();
-}
 
 registerProjectMonitorIpc();
 
@@ -52,10 +46,11 @@ const createWindow = () => {
 	mainWindow.webContents.on("did-fail-load", () => revealWindow(mainWindow));
 
 	// and load the index.html of the app.
-	if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-		mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
+	const devServerUrl = process.env.VITE_DEV_SERVER_URL;
+	if (devServerUrl) {
+		mainWindow.loadURL(devServerUrl);
 	} else {
-		mainWindow.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
+		mainWindow.loadFile(path.join(__dirname, "../dist/index.html"));
 	}
 
 	if (!app.isPackaged) mainWindow.webContents.openDevTools();
