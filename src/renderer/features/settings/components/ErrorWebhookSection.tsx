@@ -1,4 +1,8 @@
-import { ClipboardText, Plus, Trash } from "@phosphor-icons/react";
+import {
+	ClipboardTextIcon as ClipboardText,
+	PlusIcon as Plus,
+	TrashIcon as Trash,
+} from "@phosphor-icons/react";
 import { clsx } from "clsx";
 import { useEffect, useState } from "react";
 
@@ -35,8 +39,8 @@ const sampleBody = JSON.stringify(
 	2,
 );
 
-function headerRow(header: ErrorWebhookHeader = { name: "", value: "" }): HeaderRow {
-	return { ...header, id: globalThis.crypto.randomUUID() };
+function headerRow(header?: ErrorWebhookHeader): HeaderRow {
+	return { ...(header ?? { name: "", value: "" }), id: globalThis.crypto.randomUUID() };
 }
 
 function validateHeaders(rows: HeaderRow[]) {
@@ -47,7 +51,7 @@ function validateHeaders(rows: HeaderRow[]) {
 	if (headers.some(({ name }) => !/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(name))) {
 		return "Header names can only contain standard HTTP header characters.";
 	}
-	if (headers.some(({ value }) => /\r|\n/.test(value))) {
+	if (headers.some(({ value }) => /[\r\n]/.test(value))) {
 		return "Header values must stay on one line.";
 	}
 	if (new Set(headers.map(({ name }) => name.toLowerCase())).size !== headers.length) {
@@ -100,7 +104,9 @@ export function ErrorWebhookSection() {
 		if (trimmedUrl) {
 			try {
 				const protocol = new URL(trimmedUrl).protocol;
-				if (protocol !== "http:" && protocol !== "https:") throw new Error();
+				if (protocol !== "http:" && protocol !== "https:") {
+					throw new Error("Webhook URL must use HTTP or HTTPS");
+				}
 			} catch {
 				setNotice({ error: true, text: "Enter a complete HTTP or HTTPS endpoint URL." });
 				return;

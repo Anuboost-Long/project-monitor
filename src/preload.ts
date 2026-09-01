@@ -12,6 +12,7 @@ const projectMonitor: ProjectMonitorApi = {
 	supportsActiveCommandCheck: true,
 	supportsRunSnapshots: true,
 	sessionId: ipcRenderer.sendSync("project-monitor:session-id") as string,
+	signalRendererReady: () => ipcRenderer.send("project-monitor:renderer-ready"),
 	selectProjectDirectories: () => ipcRenderer.invoke("project-monitor:select-project-directories"),
 	inspectProject: (projectPath) =>
 		ipcRenderer.invoke("project-monitor:inspect-project", projectPath),

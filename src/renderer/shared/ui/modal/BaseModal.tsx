@@ -58,12 +58,17 @@ export function BaseModal({
 				event.preventDefault();
 				if (cancellable) onClose?.();
 			}}
-			onClick={(event) => {
-				if (cancellable && event.target === event.currentTarget) onClose?.();
-			}}
 			className="base-modal fixed inset-0 m-0 h-full max-h-none w-full max-w-none border-0 bg-transparent p-4 text-app-ink opacity-0 transition-opacity duration-200 ease-out open:flex open:items-center open:justify-center data-[visible=true]:opacity-100"
 		>
-			<div className={clsx("border border-app-line bg-app-paper", className)}>{children}</div>
+			{cancellable ? (
+				<button
+					type="button"
+					onClick={onClose}
+					aria-label={`Close ${label}`}
+					className="absolute inset-0 cursor-default border-0 bg-transparent p-0"
+				/>
+			) : null}
+			<div className={clsx("relative border border-app-line bg-app-paper", className)}>{children}</div>
 		</dialog>
 	);
 }

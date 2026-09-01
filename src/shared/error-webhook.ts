@@ -32,7 +32,9 @@ export interface ErrorWebhookBody {
 }
 
 function redactProjectPath(value: string, projectPath: string, projectName: string) {
-	const localPath = projectPath.replace(/[\\/]+$/, "");
+	let end = projectPath.length;
+	while (end > 0 && (projectPath[end - 1] === "/" || projectPath[end - 1] === "\\")) end -= 1;
+	const localPath = projectPath.slice(0, end);
 	if (!localPath) return value;
 
 	const normalizedPath = localPath.replaceAll("\\", "/");

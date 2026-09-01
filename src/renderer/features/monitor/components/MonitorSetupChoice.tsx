@@ -1,4 +1,4 @@
-import { CaretRight } from "@phosphor-icons/react";
+import { CaretRightIcon as CaretRight } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 
 import { BodyText, CaptionText, MonoText } from "../../../shared/typography";

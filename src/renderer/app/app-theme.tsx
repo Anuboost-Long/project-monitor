@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 export type AppTheme = "default" | "company" | "lazify";
 
@@ -27,8 +27,9 @@ export function AppThemeProvider({ children }: Readonly<{ children: ReactNode }>
 	useEffect(() => {
 		applyAppTheme(theme);
 	}, [theme]);
+	const value = useMemo(() => ({ theme, setTheme }), [theme]);
 
-	return <AppThemeContext.Provider value={{ theme, setTheme }}>{children}</AppThemeContext.Provider>;
+	return <AppThemeContext.Provider value={value}>{children}</AppThemeContext.Provider>;
 }
 
 export function useAppTheme() {

@@ -33,7 +33,6 @@
 	--color-app-terminal-ink: var(--terminal-ink);
 	--color-app-terminal-muted: var(--terminal-muted);
 
-	--background-image-app-brand: var(--brand-mark-background);
 	--background-image-app-grid:
 		linear-gradient(var(--grid-line) 1px, transparent 1px),
 		linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
@@ -63,7 +62,6 @@
 	--sidebar-status: #8f9a95;
 	--sidebar-hover: #202b27;
 	--sidebar-active: #26322e;
-	--brand-mark-background: var(--accent);
 	--ready: #79b991;
 	--ready-ring: rgba(121, 185, 145, 0.12);
 	--terminal: #101714;
@@ -96,7 +94,6 @@
 	--sidebar-status: #ae98b5;
 	--sidebar-hover: #302038;
 	--sidebar-active: #392542;
-	--brand-mark-background: linear-gradient(135deg, #76368e 0 66%, #f07a32 66% 100%);
 	--ready: #8fc7a3;
 	--ready-ring: rgba(143, 199, 163, 0.14);
 	--terminal: #1b111f;
@@ -129,7 +126,6 @@
 	--sidebar-status: #9ca3af;
 	--sidebar-hover: #111827;
 	--sidebar-active: #182233;
-	--brand-mark-background: var(--accent);
 	--ready: #22c55e;
 	--ready-ring: rgba(34, 197, 94, 0.14);
 	--terminal: #111827;

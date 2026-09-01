@@ -1,4 +1,9 @@
-import { CalendarBlank, CaretLeft, CaretRight, X } from "@phosphor-icons/react";
+import {
+	CalendarBlankIcon as CalendarBlank,
+	CaretLeftIcon as CaretLeft,
+	CaretRightIcon as CaretRight,
+	XIcon as X,
+} from "@phosphor-icons/react";
 import { clsx } from "clsx";
 import { useEffect, useMemo, useState } from "react";
 
@@ -67,7 +72,7 @@ export function DatePicker({ value, max, onChange }: Readonly<DatePickerProps>) 
 			>
 				<header className="flex items-center justify-between gap-4 border-b border-app-line px-5 py-4">
 					<div>
-						<CaptionText className="text-[9px] tracking-[0.1em] uppercase">Error logs</CaptionText>
+						<CaptionText className="text-[9px] tracking-widest uppercase">Error logs</CaptionText>
 						<SectionTitle className="mt-1 text-base">Choose a date</SectionTitle>
 					</div>
 					<button

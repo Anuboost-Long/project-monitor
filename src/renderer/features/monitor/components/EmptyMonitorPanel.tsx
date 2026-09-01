@@ -1,4 +1,4 @@
-import { Plus } from "@phosphor-icons/react";
+import { PlusIcon as Plus } from "@phosphor-icons/react";
 import { clsx } from "clsx";
 
 import { CaptionText, MonoText } from "../../../shared/typography";

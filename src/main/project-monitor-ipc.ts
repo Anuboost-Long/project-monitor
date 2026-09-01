@@ -53,7 +53,7 @@ function validateErrorWebhookSettings(value: unknown): ErrorWebhookSettings {
 	const url = Reflect.get(value, "url");
 	const headers = Reflect.get(value, "headers");
 	if (typeof url !== "string" || !Array.isArray(headers)) {
-		throw new Error("Invalid webhook settings");
+		throw new TypeError("Invalid webhook settings");
 	}
 
 	const trimmedUrl = url.trim();
@@ -73,14 +73,14 @@ function validateErrorWebhookSettings(value: unknown): ErrorWebhookSettings {
 		const name = Reflect.get(header, "name");
 		const headerValue = Reflect.get(header, "value");
 		if (typeof name !== "string" || typeof headerValue !== "string") {
-			throw new Error("Invalid webhook header");
+			throw new TypeError("Invalid webhook header");
 		}
 
 		const trimmedName = name.trim();
 		if (!/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(trimmedName)) {
 			throw new Error("Invalid webhook header name");
 		}
-		if (/\r|\n/.test(headerValue)) throw new Error("Invalid webhook header value");
+		if (/[\r\n]/.test(headerValue)) throw new Error("Invalid webhook header value");
 
 		const normalizedName = trimmedName.toLowerCase();
 		if (names.has(normalizedName)) throw new Error("Duplicate webhook header name");
@@ -140,10 +140,19 @@ function errorWebhookResponseDetail(data: unknown, fallback: string) {
 
 function errorWebhookFailure(error: unknown): ErrorWebhookDeliveryResult {
 	if (!(error instanceof ApiRequestError)) {
+		let detail: string;
+		if (error instanceof Error) detail = error.message;
+		else if (typeof error === "object") {
+			try {
+				detail = JSON.stringify(error) ?? "Unknown error";
+			} catch {
+				detail = "Unknown error";
+			}
+		} else detail = String(error);
 		return {
 			sent: false,
 			reason: "unknown",
-			detail: error instanceof Error ? error.message : String(error),
+			detail,
 		};
 	}
 	if (error.code && CERTIFICATE_ERROR_CODES.has(error.code)) {
@@ -350,13 +359,13 @@ function readProcessChildren(): Map<number, number[]> | null {
 	let processes: string;
 
 	try {
-		processes = execFileSync("ps", ["-axo", "pid=,ppid="], { encoding: "utf8" });
+		processes = execFileSync("/bin/ps", ["-axo", "pid=,ppid="], { encoding: "utf8" });
 	} catch {
 		return null;
 	}
 
 	for (const line of processes.split("\n")) {
-		const match = line.match(/^\s*(\d+)\s+(\d+)\s*$/);
+		const match = /^\s*(\d+)\s+(\d+)\s*$/.exec(line);
 		if (!match) continue;
 
 		const pid = Number(match[1]);
@@ -384,7 +393,7 @@ function processTree(rootPid: number): number[] {
 }
 
 function shellQuote(value: string): string {
-	return `'${value.replaceAll("'", `'\\''`)}'`;
+	return "'" + value.replaceAll("'", String.raw`'\''`) + "'";
 }
 
 function nvmBootstrap(projectPath: string): string {
@@ -675,7 +684,7 @@ export function registerProjectMonitorIpc() {
 		}
 		let processes: string;
 		try {
-			processes = execFileSync("ps", ["-o", "pid=,tpgid=", "-p", terminalPids.join(",")], {
+			processes = execFileSync("/bin/ps", ["-o", "pid=,tpgid=", "-p", terminalPids.join(",")], {
 				encoding: "utf8",
 			});
 		} catch {
@@ -685,7 +694,7 @@ export function registerProjectMonitorIpc() {
 
 		const foregroundGroups = new Map<number, number>();
 		for (const line of processes.split("\n")) {
-			const match = line.match(/^\s*(\d+)\s+(-?\d+)\s*$/);
+			const match = /^\s*(\d+)\s+(-?\d+)\s*$/.exec(line);
 			if (match) foregroundGroups.set(Number(match[1]), Number(match[2]));
 		}
 

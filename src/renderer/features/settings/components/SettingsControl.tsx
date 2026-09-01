@@ -1,4 +1,7 @@
+import { CaretDownIcon as CaretDown } from "@phosphor-icons/react";
+import { clsx } from "clsx";
 import type { ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { CaptionText, SectionTitle } from "../../../shared/typography";
 
@@ -40,20 +43,133 @@ export function SettingRow({ children, description, id, title }: Readonly<Settin
 }
 
 export function SettingSelect({ defaultValue, id, options }: Readonly<SettingSelectProps>) {
+	const [value, setValue] = useState(defaultValue);
+	const [open, setOpen] = useState(false);
+	const rootRef = useRef<HTMLDivElement>(null);
+	const triggerRef = useRef<HTMLButtonElement>(null);
+	const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
+	const selectedIndex = options.findIndex((option) => option.value === value);
+
+	useEffect(() => {
+		if (!open) return;
+
+		const closeOutside = (event: PointerEvent) => {
+			if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+		};
+
+		document.addEventListener("pointerdown", closeOutside);
+		return () => document.removeEventListener("pointerdown", closeOutside);
+	}, [open]);
+
+	const openOptions = () => {
+		setOpen(true);
+		requestAnimationFrame(() => optionRefs.current[Math.max(selectedIndex, 0)]?.focus());
+	};
+
+	const selectOption = (nextValue: string) => {
+		setValue(nextValue);
+		setOpen(false);
+		requestAnimationFrame(() => triggerRef.current?.focus());
+	};
+
+	const focusOption = (index: number) => {
+		optionRefs.current[(index + options.length) % options.length]?.focus();
+	};
+
 	return (
-		<select
-			id={id}
-			defaultValue={defaultValue}
-			aria-labelledby={`${id}-label`}
-			aria-describedby={`${id}-description`}
-			className="min-h-10 w-full rounded-sm border border-app-line bg-app-paper px-3 text-xs text-app-ink outline-none transition-colors hover:border-app-accent focus:border-app-accent focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-app-focus"
-		>
-			{options.map((option) => (
-				<option key={option.value} value={option.value}>
-					{option.label}
-				</option>
-			))}
-		</select>
+		<div ref={rootRef} className="relative w-full">
+			<button
+				ref={triggerRef}
+				id={id}
+				type="button"
+				onClick={() => (open ? setOpen(false) : openOptions())}
+				onKeyDown={(event) => {
+					if (event.key === "Escape" && open) {
+						event.preventDefault();
+						setOpen(false);
+						return;
+					}
+					if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+					event.preventDefault();
+					openOptions();
+				}}
+				aria-labelledby={`${id}-label ${id}-value`}
+				aria-describedby={`${id}-description`}
+				aria-controls={`${id}-options`}
+				aria-expanded={open}
+				aria-haspopup="listbox"
+				className={clsx(
+					"flex min-h-10 w-full items-center justify-between gap-3 rounded-sm bg-app-paper",
+					"border border-app-line px-3 text-left text-xs text-app-ink outline-none transition-colors",
+					"hover:border-app-accent focus:border-app-accent focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-app-focus",
+				)}
+			>
+				<span id={`${id}-value`} className="truncate">
+					{options[selectedIndex]?.label}
+				</span>
+				<CaretDown
+					size={14}
+					weight="bold"
+					className={clsx("shrink-0 transition-transform", open && "rotate-180")}
+					aria-hidden="true"
+				/>
+			</button>
+
+			<ul
+				id={`${id}-options`}
+				role="listbox"
+				aria-labelledby={`${id}-label`}
+				hidden={!open}
+				className="absolute top-full right-0 left-0 z-20 mt-1 max-h-56 overflow-y-auto rounded-sm border border-app-line bg-app-paper p-1 shadow-lg"
+			>
+				{options.map((option, index) => (
+					<li key={option.value}>
+						<button
+							ref={(element) => {
+								optionRefs.current[index] = element;
+							}}
+							type="button"
+							role="option"
+							aria-selected={option.value === value}
+							tabIndex={option.value === value ? 0 : -1}
+							onClick={() => selectOption(option.value)}
+							onKeyDown={(event) => {
+								switch (event.key) {
+									case "ArrowDown":
+										event.preventDefault();
+										focusOption(index + 1);
+										break;
+									case "ArrowUp":
+										event.preventDefault();
+										focusOption(index - 1);
+										break;
+									case "Home":
+										event.preventDefault();
+										focusOption(0);
+										break;
+									case "End":
+										event.preventDefault();
+										focusOption(options.length - 1);
+										break;
+									case "Escape":
+										event.preventDefault();
+										setOpen(false);
+										triggerRef.current?.focus();
+										break;
+								}
+							}}
+							className={clsx(
+								"block min-h-9 w-full rounded-sm px-2.5 text-left text-[11px] text-app-ink",
+								"transition-colors hover:bg-app-soft focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-app-focus",
+								option.value === value && "bg-app-soft",
+							)}
+						>
+							{option.label}
+						</button>
+					</li>
+				))}
+			</ul>
+		</div>
 	);
 }
 

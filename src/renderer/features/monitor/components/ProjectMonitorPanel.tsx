@@ -1,4 +1,9 @@
-import { ArrowsInSimple, ArrowsOutSimple, Stop, X } from "@phosphor-icons/react";
+import {
+	ArrowsInSimpleIcon as ArrowsInSimple,
+	ArrowsOutSimpleIcon as ArrowsOutSimple,
+	StopIcon as Stop,
+	XIcon as X,
+} from "@phosphor-icons/react";
 import { clsx } from "clsx";
 
 import { CaptionText, MonoText, SectionTitle } from "../../../shared/typography";

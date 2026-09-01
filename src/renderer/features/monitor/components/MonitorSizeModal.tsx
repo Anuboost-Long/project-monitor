@@ -1,4 +1,4 @@
-import { ArrowsOutSimple, X } from "@phosphor-icons/react";
+import { ArrowsOutSimpleIcon as ArrowsOutSimple, XIcon as X } from "@phosphor-icons/react";
 import { clsx } from "clsx";
 import { useEffect, useState } from "react";
 
@@ -19,10 +19,25 @@ const sizes: Array<{ size: MonitorPanelSize; label: string; description: string 
 	{ size: "large", label: "Large", description: "Two columns and two rows" },
 ];
 
-const sizeCells: Record<MonitorPanelSize, boolean[]> = {
-	default: [true, false, false, false],
-	wide: [true, true, false, false],
-	large: [true, true, true, true],
+const sizeCells: Record<MonitorPanelSize, Array<[string, boolean]>> = {
+	default: [
+		["top-left", true],
+		["top-right", false],
+		["bottom-left", false],
+		["bottom-right", false],
+	],
+	wide: [
+		["top-left", true],
+		["top-right", true],
+		["bottom-left", false],
+		["bottom-right", false],
+	],
+	large: [
+		["top-left", true],
+		["top-right", true],
+		["bottom-left", true],
+		["bottom-right", true],
+	],
 };
 
 export function MonitorSizeModal({
@@ -86,7 +101,7 @@ export function MonitorSizeModal({
 								className="grid size-9 shrink-0 grid-cols-2 grid-rows-2 gap-0.5 rounded-sm border border-app-line bg-app-paper p-1"
 								aria-hidden="true"
 							>
-								{sizeCells[size].map((filled, cell) => (
+								{sizeCells[size].map(([cell, filled]) => (
 									<span key={cell} className={filled ? "bg-app-accent" : "bg-app-line"} />
 								))}
 							</span>

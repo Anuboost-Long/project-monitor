@@ -11,6 +11,30 @@ interface ThemeOptionCardProps {
 	onSelect: (theme: AppTheme) => void;
 }
 
+const themePreview: Record<
+	AppTheme,
+	{ frame: string; sidebar: string; accent: string; line: string }
+> = {
+	default: {
+		frame: "border-[#cbc9c1] bg-[#f4f2eb]",
+		sidebar: "border-[#313b37] bg-[#18211e]",
+		accent: "bg-[#e4582b]",
+		line: "bg-[#d5d1c7]",
+	},
+	company: {
+		frame: "border-[#ddcee2] bg-[#faf7fb]",
+		sidebar: "border-[#402a48] bg-[#24172a]",
+		accent: "bg-[linear-gradient(90deg,#76368e_0_68%,#f07a32_68%_100%)]",
+		line: "bg-[#dfd0e4]",
+	},
+	lazify: {
+		frame: "border-[#263244] bg-[#0b1220]",
+		sidebar: "border-[#263244] bg-[#070d18]",
+		accent: "bg-[#10b981]",
+		line: "bg-[#374151]",
+	},
+};
+
 export function ThemeOptionCard({
 	id,
 	label,
@@ -18,8 +42,7 @@ export function ThemeOptionCard({
 	selected,
 	onSelect,
 }: Readonly<ThemeOptionCardProps>) {
-	const isDefault = id === "default";
-	const isCompany = id === "company";
+	const preview = themePreview[id];
 
 	return (
 		<button
@@ -37,47 +60,15 @@ export function ThemeOptionCard({
 			<span
 				className={clsx(
 					"grid h-16.5 w-full grid-cols-[28px_1fr] overflow-hidden rounded-sm border",
-					isDefault
-						? "border-[#cbc9c1] bg-[#f4f2eb]"
-						: isCompany
-							? "border-[#ddcee2] bg-[#faf7fb]"
-							: "border-[#263244] bg-[#0b1220]",
+					preview.frame,
 				)}
 				aria-hidden="true"
 			>
-				<span
-					className={clsx(
-						"border-r",
-						isDefault
-							? "border-[#313b37] bg-[#18211e]"
-							: isCompany
-								? "border-[#402a48] bg-[#24172a]"
-								: "border-[#263244] bg-[#070d18]",
-					)}
-				/>
+				<span className={clsx("border-r", preview.sidebar)} />
 				<span className="flex flex-col gap-1.5 px-2 py-2.5">
-					<span
-						className={clsx(
-							"block h-1.5 rounded-sm",
-							isDefault
-								? "bg-[#e4582b]"
-								: isCompany
-									? "bg-[linear-gradient(90deg,#76368e_0_68%,#f07a32_68%_100%)]"
-									: "bg-[#10b981]",
-						)}
-					/>
-					<span
-						className={clsx(
-							"block h-1.5 w-3/4 rounded-sm",
-							isDefault ? "bg-[#d5d1c7]" : isCompany ? "bg-[#dfd0e4]" : "bg-[#374151]",
-						)}
-					/>
-					<span
-						className={clsx(
-							"block h-1.5 w-1/2 rounded-sm",
-							isDefault ? "bg-[#d5d1c7]" : isCompany ? "bg-[#dfd0e4]" : "bg-[#374151]",
-						)}
-					/>
+					<span className={clsx("block h-1.5 rounded-sm", preview.accent)} />
+					<span className={clsx("block h-1.5 w-3/4 rounded-sm", preview.line)} />
+					<span className={clsx("block h-1.5 w-1/2 rounded-sm", preview.line)} />
 				</span>
 			</span>
 			<span className="flex min-w-0 flex-col gap-2">

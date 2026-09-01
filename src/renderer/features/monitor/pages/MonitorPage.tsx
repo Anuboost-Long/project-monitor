@@ -1,4 +1,4 @@
-import { GridFour, Plus } from "@phosphor-icons/react";
+import { GridFourIcon as GridFour, PlusIcon as Plus } from "@phosphor-icons/react";
 import { clsx } from "clsx";
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
@@ -62,10 +62,12 @@ export function MonitorPage() {
 		panels.some((panel) => panel.slot === slot),
 	).some((occupied) => !occupied);
 	const slotCount = minimumSlotCount + (hasEmptySlot ? 0 : 1);
-	const slots = Array.from({ length: slotCount }, (_, slot) =>
-		panels.find((panel) => panel.slot === slot),
-	);
-	const availableSlot = slots.findIndex((panel) => !panel);
+	const slots = Array.from({ length: slotCount }, (_, slot) => ({
+		id: `monitor-slot-${slot}`,
+		panel: panels.find((panel) => panel.slot === slot),
+		slot,
+	}));
+	const availableSlot = slots.findIndex(({ panel }) => !panel);
 	const renamePanel = panels.find((panel) => panel.id === renameRunId) ?? null;
 	const sizingPanel = panels.find((panel) => panel.id === sizingRunId) ?? null;
 	const scriptCount = projects.reduce(
@@ -172,8 +174,8 @@ export function MonitorPage() {
 					</span>
 				</header>
 
-				<div className={clsx("grid auto-rows-[22rem] gap-4", columnClassName[columns])}>
-					{slots.map((panel, slot) =>
+				<div className={clsx("grid auto-rows-88 gap-4", columnClassName[columns])}>
+					{slots.map(({ id, panel, slot }) =>
 						panel ? (
 							<ProjectMonitorPanel
 								key={panel.id}
@@ -209,7 +211,7 @@ export function MonitorPage() {
 							/>
 						) : (
 							<EmptyMonitorPanel
-								key={slot}
+								key={id}
 								disabled={projects.length === 0}
 								dropTarget={dropSlot === slot}
 								slot={slot}

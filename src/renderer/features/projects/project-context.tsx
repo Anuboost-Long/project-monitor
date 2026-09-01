@@ -1,4 +1,12 @@
-import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from "react";
+import {
+	createContext,
+	type ReactNode,
+	useContext,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 
 import type {
 	ProjectConsoleError,
@@ -220,15 +228,13 @@ export function ProjectMonitorProvider({ children }: Readonly<{ children: ReactN
 							return { ...panel, errors: event.errors };
 						}
 
+						let status: MonitorStatus;
+						if (panel.status === "stopping" || panel.status === "stopped") status = "stopped";
+						else status = event.exitCode === 0 ? "done" : "error";
 						return {
 							...panel,
 							exitCode: event.exitCode,
-							status:
-								panel.status === "stopping" || panel.status === "stopped"
-									? "stopped"
-									: event.exitCode === 0
-										? "done"
-										: "error",
+							status,
 						};
 					}),
 				);
@@ -399,27 +405,38 @@ export function ProjectMonitorProvider({ children }: Readonly<{ children: ReactN
 		}
 		setPanels((current) => current.filter((candidate) => candidate.id !== runId));
 	};
-
-	return (
-		<ProjectMonitorContext.Provider
-			value={{
-				projects,
-				panels,
-				busyRunIds,
-				syncProjects,
-				resyncProject,
-				removeProject,
-				startMonitor,
-				moveMonitor,
-				renameMonitor,
-				resizeMonitor,
-				stopMonitor,
-				clearMonitor,
-			}}
-		>
-			{children}
-		</ProjectMonitorContext.Provider>
+	const value = useMemo(
+		() => ({
+			projects,
+			panels,
+			busyRunIds,
+			syncProjects,
+			resyncProject,
+			removeProject,
+			startMonitor,
+			moveMonitor,
+			renameMonitor,
+			resizeMonitor,
+			stopMonitor,
+			clearMonitor,
+		}),
+		[
+			projects,
+			panels,
+			busyRunIds,
+			syncProjects,
+			resyncProject,
+			removeProject,
+			startMonitor,
+			moveMonitor,
+			renameMonitor,
+			resizeMonitor,
+			stopMonitor,
+			clearMonitor,
+		],
 	);
+
+	return <ProjectMonitorContext.Provider value={value}>{children}</ProjectMonitorContext.Provider>;
 }
 
 export function useProjectMonitor() {
