@@ -1,14 +1,18 @@
-import { CaretLeft, GearSix } from "@phosphor-icons/react";
+import { CaretLeftIcon as CaretLeft, GearSixIcon as GearSix } from "@phosphor-icons/react";
 import { clsx } from "clsx";
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 
+import markDark from "../../../assets/icons/mark-dark.png";
+import markLight from "../../../assets/icons/mark-light.png";
 import { CaptionText, OverlineText, SectionTitle } from "../shared/typography";
 import { appPages, settingsPage } from "./app-navigation";
+import { useAppTheme } from "./app-theme";
 import { AppNavigation } from "./components/AppNavigation";
 
 export function AppShell() {
 	const location = useLocation();
+	const { theme } = useAppTheme();
 	const [sidebarOpen, setSidebarOpen] = useState(
 		() => globalThis.localStorage.getItem("project-monitor-sidebar-open") !== "false",
 	);
@@ -26,7 +30,7 @@ export function AppShell() {
 	return (
 		<main
 			className={clsx(
-				"grid h-screen overflow-hidden bg-app-paper bg-app-grid text-app-ink [background-size:32px_32px]",
+				"grid h-screen overflow-hidden bg-app-paper bg-app-grid bg-size-[32px_32px] text-app-ink",
 				"transition-[grid-template-columns] duration-200 ease-out",
 				"max-[720px]:grid-cols-1 max-[720px]:grid-rows-[auto_minmax(0,1fr)]",
 				sidebarOpen ? "grid-cols-[280px_minmax(0,1fr)]" : "grid-cols-[72px_minmax(0,1fr)]",
@@ -44,11 +48,15 @@ export function AppShell() {
 						onClick={() => {
 							if (!sidebarOpen) setSidebarOpen(true);
 						}}
-						className="grid size-9.5 shrink-0 place-items-center rounded-lg bg-app-brand font-display text-[13px] font-extrabold tracking-[-0.04em] text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-focus"
+						className="grid size-9.5 shrink-0 place-items-center overflow-hidden rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-focus"
 						aria-label={sidebarOpen ? undefined : "Expand sidebar"}
 						title={sidebarOpen ? undefined : "Expand sidebar"}
 					>
-						PM
+						<img
+							src={theme === "default" ? markDark : markLight}
+							alt="Project Monitor"
+							className="size-full"
+						/>
 					</button>
 					{sidebarOpen ? (
 						<span className="min-w-0 flex-1">
@@ -90,7 +98,7 @@ export function AppShell() {
 								className="size-1.5 rounded-full bg-app-ready shadow-[0_0_0_3px_var(--ready-ring)]"
 								aria-hidden="true"
 							/>
-							<OverlineText as="span" className="text-[10px] tracking-[0.05em] text-app-sidebar-status">
+							<OverlineText as="span" className="text-[10px] tracking-wider text-app-sidebar-status">
 								Ready to monitor
 							</OverlineText>
 						</span>

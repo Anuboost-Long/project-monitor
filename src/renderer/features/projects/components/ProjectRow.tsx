@@ -1,4 +1,4 @@
-import { ArrowsClockwise, Trash } from "@phosphor-icons/react";
+import { ArrowsClockwiseIcon as ArrowsClockwise, TrashIcon as Trash } from "@phosphor-icons/react";
 
 import type { SyncedProject } from "../../../../shared/project-monitor";
 import { CaptionText, MonoText, SectionTitle } from "../../../shared/typography";

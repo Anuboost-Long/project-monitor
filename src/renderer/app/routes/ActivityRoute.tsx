@@ -1,4 +1,8 @@
-import { ClipboardText, PaperPlaneTilt, WarningDiamond } from "@phosphor-icons/react";
+import {
+	ClipboardTextIcon as ClipboardText,
+	PaperPlaneTiltIcon as PaperPlaneTilt,
+	WarningDiamondIcon as WarningDiamond,
+} from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 
 import { createErrorWebhookBody } from "../../../shared/project-monitor";
@@ -140,7 +144,7 @@ function ActivityErrorItem({ record }: Readonly<{ record: ProjectConsoleErrorRec
 						aria-hidden="true"
 					/>
 					<div className="min-w-0 flex-1">
-						<SectionTitle className="break-words text-sm">{record.message}</SectionTitle>
+						<SectionTitle className="wrap-break-word text-sm">{record.message}</SectionTitle>
 						<CaptionText className="mt-1">
 							{record.projectName} · {record.command} · {new Date(record.timestamp).toLocaleString()}
 						</CaptionText>
@@ -276,6 +280,33 @@ export function ActivityRoute() {
 	}).format(parseIsoDate(selectedDate) ?? new Date());
 	const visibleRecords = recordsDate === selectedDate ? records : [];
 	const readingSelectedDate = loading || recordsDate !== selectedDate;
+	let content = (
+		<div className="space-y-3">
+			{visibleRecords.slice(0, 200).map((record) => (
+				<ActivityErrorItem key={record.id} record={record} />
+			))}
+		</div>
+	);
+	if (readingSelectedDate) {
+		content = <CaptionText>Reading saved errors…</CaptionText>;
+	} else if (loadError) {
+		content = (
+			<section className="border border-app-line bg-app-panel p-5.5">
+				<SectionTitle className="mb-1.5">Error log unavailable</SectionTitle>
+				<CaptionText>Restart Project Monitor to enable the NDJSON error stream.</CaptionText>
+			</section>
+		);
+	} else if (visibleRecords.length === 0) {
+		content = (
+			<section className="grid min-h-29 grid-cols-[52px_minmax(0,1fr)] items-center gap-5 border border-app-line bg-app-panel p-5.5 max-[720px]:grid-cols-[34px_1fr]">
+				<MonoText>--</MonoText>
+				<div>
+					<SectionTitle className="mb-1.5">No errors for {selectedDateLabel}</SectionTitle>
+					<CaptionText>No error log file exists for this date.</CaptionText>
+				</div>
+			</section>
+		);
+	}
 
 	return (
 		<div className="mx-auto w-full max-w-280 px-12 py-14 max-[720px]:px-5.5 max-[720px]:py-9.5">
@@ -291,28 +322,7 @@ export function ActivityRoute() {
 				<DatePicker value={selectedDate} max={today} onChange={setSelectedDate} />
 			</header>
 
-			{readingSelectedDate ? (
-				<CaptionText>Reading saved errors…</CaptionText>
-			) : loadError ? (
-				<section className="border border-app-line bg-app-panel p-5.5">
-					<SectionTitle className="mb-1.5">Error log unavailable</SectionTitle>
-					<CaptionText>Restart Project Monitor to enable the NDJSON error stream.</CaptionText>
-				</section>
-			) : visibleRecords.length === 0 ? (
-				<section className="grid min-h-29 grid-cols-[52px_minmax(0,1fr)] items-center gap-5 border border-app-line bg-app-panel p-5.5 max-[720px]:grid-cols-[34px_1fr]">
-					<MonoText>--</MonoText>
-					<div>
-						<SectionTitle className="mb-1.5">No errors for {selectedDateLabel}</SectionTitle>
-						<CaptionText>No error log file exists for this date.</CaptionText>
-					</div>
-				</section>
-			) : (
-				<div className="space-y-3">
-					{visibleRecords.slice(0, 200).map((record) => (
-						<ActivityErrorItem key={record.id} record={record} />
-					))}
-				</div>
-			)}
+			{content}
 		</div>
 	);
 }

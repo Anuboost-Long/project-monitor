@@ -1,4 +1,9 @@
-import { FolderOpen, Pulse, TerminalWindow, type Icon } from "@phosphor-icons/react";
+import {
+	FolderOpenIcon as FolderOpen,
+	PulseIcon as Pulse,
+	TerminalWindowIcon as TerminalWindow,
+	type Icon,
+} from "@phosphor-icons/react";
 
 import { appRoute } from "./app-routes";
 

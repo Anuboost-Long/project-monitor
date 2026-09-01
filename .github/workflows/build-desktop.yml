@@ -1,0 +1,54 @@
+name: Build desktop apps
+
+on:
+ workflow_dispatch:
+ push:
+  tags:
+   - "v*"
+
+permissions:
+ contents: read
+
+jobs:
+ build:
+  name: Build ${{ matrix.name }}
+  strategy:
+   fail-fast: false
+   matrix:
+    include:
+     - name: macOS
+       os: macos-latest
+       command: npm run make:mac
+       artifact: project-monitor-macos
+     - name: Windows
+       os: windows-latest
+       command: npm run make:win
+       artifact: project-monitor-windows
+
+  runs-on: ${{ matrix.os }}
+
+  steps:
+   - name: Check out repository
+     uses: actions/checkout@v4
+
+   - name: Set up Node.js
+     uses: actions/setup-node@v4
+     with:
+      node-version: 22
+      cache: npm
+
+   - name: Install dependencies
+     run: npm ci
+
+   - name: Verify source
+     run: npm run verify
+
+   - name: Build distributables
+     run: ${{ matrix.command }}
+
+   - name: Upload artifacts
+     uses: actions/upload-artifact@v4
+     with:
+      name: ${{ matrix.artifact }}
+      path: out/make/**/*
+      if-no-files-found: error

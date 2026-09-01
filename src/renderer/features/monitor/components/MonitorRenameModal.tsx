@@ -1,4 +1,4 @@
-import { X } from "@phosphor-icons/react";
+import { XIcon as X } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 
 import { BodyText, CaptionText, OverlineText, SectionTitle } from "../../../shared/typography";

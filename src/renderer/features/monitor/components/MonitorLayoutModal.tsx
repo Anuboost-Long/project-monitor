@@ -1,4 +1,4 @@
-import { GridFour, X } from "@phosphor-icons/react";
+import { GridFourIcon as GridFour, XIcon as X } from "@phosphor-icons/react";
 import { clsx } from "clsx";
 
 import { BodyText, CaptionText, OverlineText, SectionTitle } from "../../../shared/typography";

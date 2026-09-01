@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+	<dict>
+		<!-- Naming an entitlements file replaces @electron/osx-sign's built-in
+		     defaults rather than extending them, so the keys Electron needs are
+		     repeated here. -->
+		<!-- V8 compiles JavaScript at runtime. -->
+		<key>com.apple.security.cs.allow-jit</key>
+		<true/>
+		<key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+		<true/>
+		<!-- Without a Developer ID certificate the bundle is ad-hoc signed, so
+		     nothing in it carries a Team ID. The hardened runtime's library
+		     validation refuses to load Electron Framework and node-pty's native
+		     binding into a process whose Team ID does not match theirs, and the
+		     app dies in dyld before reaching main. -->
+		<key>com.apple.security.cs.disable-library-validation</key>
+		<true/>
+	</dict>
+</plist>

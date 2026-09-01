@@ -86,6 +86,7 @@ export interface ProjectMonitorApi {
 	supportsActiveCommandCheck?: boolean;
 	supportsRunSnapshots?: boolean;
 	sessionId?: string;
+	signalRendererReady?: () => void;
 	selectProjectDirectories: () => Promise<string[]>;
 	inspectProject: (projectPath: string) => Promise<SyncedProject>;
 	runProjectCommand: (request: ProjectRunRequest) => Promise<void>;

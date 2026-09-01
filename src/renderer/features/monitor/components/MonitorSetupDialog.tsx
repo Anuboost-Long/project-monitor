@@ -1,4 +1,11 @@
-import { ArrowLeft, Folder, MagnifyingGlass, Play, TerminalWindow, X } from "@phosphor-icons/react";
+import {
+	ArrowLeftIcon as ArrowLeft,
+	FolderIcon as Folder,
+	MagnifyingGlassIcon as MagnifyingGlass,
+	PlayIcon as Play,
+	TerminalWindowIcon as TerminalWindow,
+	XIcon as X,
+} from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { ProjectRunKind, SyncedProject } from "../../../../shared/project-monitor";
@@ -30,6 +37,10 @@ const stageTitle: Record<SetupStage, string> = {
 function matches(query: string, ...fields: string[]) {
 	const needle = query.trim().toLowerCase();
 	return needle.length === 0 || fields.some((field) => field.toLowerCase().includes(needle));
+}
+
+function canRun(project: SyncedProject | null, kind: ProjectRunKind, value: string) {
+	return project !== null && (kind !== "script" || Boolean(value.trim()));
 }
 
 export function MonitorSetupDialog({
@@ -78,7 +89,7 @@ export function MonitorSetupDialog({
 	};
 
 	const run = (kind: ProjectRunKind, value: string) => {
-		if (!project || (kind === "script" && !value.trim())) return;
+		if (!canRun(project, kind, value)) return;
 		onRun(project, kind, value.trim());
 		close();
 	};

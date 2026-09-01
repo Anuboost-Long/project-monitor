@@ -87,7 +87,20 @@ typings/
 
 # Vite
 .vite/
+dist/
 
 # Electron-Forge
 out/
 .lazify/
+
+# Signing credentials and logs
+*.p12
+*.pfx
+*.provisionprofile
+*.mobileprovision
+*.cer
+*.key
+*.pem
+.env.signing
+.env.trustedsigning
+electron-windows-sign.log

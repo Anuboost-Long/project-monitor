@@ -1,4 +1,7 @@
-import { FolderOpen, FolderSimplePlus } from "@phosphor-icons/react";
+import {
+	FolderOpenIcon as FolderOpen,
+	FolderSimplePlusIcon as FolderSimplePlus,
+} from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 
 import { CaptionText, MonoText, OverlineText, SectionTitle } from "../../../shared/typography";

@@ -13,3 +13,9 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
 		<App />
 	</React.StrictMode>,
 );
+
+// Dismisses the launch card. The second frame is where the first render has
+// actually been painted, so the window never takes over from it empty.
+requestAnimationFrame(() => {
+	requestAnimationFrame(() => window.projectMonitor.signalRendererReady?.());
+});

@@ -1,4 +1,7 @@
-import { ArrowsClockwise, FolderOpen } from "@phosphor-icons/react";
+import {
+	ArrowsClockwiseIcon as ArrowsClockwise,
+	FolderOpenIcon as FolderOpen,
+} from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 
 import {

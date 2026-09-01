@@ -1,15 +1,53 @@
 import type { ProjectConsoleError } from "../shared/project-monitor";
 
-const ANSI_ESCAPE = new RegExp(
-	String.raw`\x1B(?:[@-_][0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1B\\))`,
-	"g",
-);
-const ERROR_START =
-	/^(?:\[(?:browser|client|server)\]\s*)?(?:[✖×⨯]\s*)?\[?(?:error(?:\s|:|-)|npm err!|module not found\b|(?:uncaught\s+)?(?:aggregate|eval|internal|module|range|reference|syntax|type|uri)error\b|failed to compile\b|build error\b|unhandled(?:promise)?rejection\b|uncaught exception\b|\w*err_[a-z_]+\b)/i;
+const ESCAPE = String.fromCodePoint(27);
+const BELL = String.fromCodePoint(7);
+const ANSI_CONTROL_SEQUENCE = /^[@-_][0-?]*[ -/]*[@-~]/;
+const ERROR_PREFIX = /^(?:\[(?:browser|client|server)\]\s*)?(?:[✖×⨯]\s*)?\[?/i;
+const ERROR_START = [
+	/^(?:error(?:\s|:|-)|npm err!|module not found\b)/i,
+	/^(?:uncaught\s+)?(?:aggregate|eval|internal|module|range|reference|syntax|type|uri)error\b/i,
+	/^(?:failed to compile|build error|unhandled(?:promise)?rejection|uncaught exception)\b/i,
+	/^\w*err_[a-z_]+\b/i,
+];
 const MAX_ERROR_LINES = 40;
 
 function cleanTerminalOutput(output: string) {
-	return output.replace(ANSI_ESCAPE, "").replaceAll("\r", "");
+	let cleaned = "";
+	let index = 0;
+	while (index < output.length) {
+		if (output[index] !== ESCAPE) {
+			cleaned += output[index];
+			index += 1;
+			continue;
+		}
+
+		const remainder = output.slice(index + 1);
+		const controlSequence = ANSI_CONTROL_SEQUENCE.exec(remainder)?.[0];
+		if (controlSequence) {
+			index += controlSequence.length + 1;
+			continue;
+		}
+
+		if (remainder.startsWith("]")) {
+			const bellEnd = remainder.indexOf(BELL, 1);
+			const escapeEnd = remainder.lastIndexOf(`${ESCAPE}\\`);
+			const end = bellEnd >= 0 ? bellEnd : escapeEnd;
+			if (end >= 0) {
+				index += end + (end === bellEnd ? 2 : 3);
+				continue;
+			}
+		}
+
+		cleaned += output[index];
+		index += 1;
+	}
+	return cleaned.replaceAll("\r", "");
+}
+
+function startsError(line: string) {
+	const value = line.replace(ERROR_PREFIX, "");
+	return ERROR_START.some((pattern) => pattern.test(value));
 }
 
 function stringValue(value: unknown) {
@@ -26,14 +64,13 @@ function shouldCaptureApiError(source: string | undefined, statusCode: number | 
 }
 
 function statusFromText(value: string) {
-	const match = value.match(
-		/\b(?:http(?:\/\d(?:\.\d)?)?\s+|status(?:\s+code)?\s*[:=]?\s*)([1-5]\d{2})\b/i,
-	);
-	return statusValue(match?.[1]);
+	const httpStatus = /\bhttp(?:\/\d(?:\.\d)?)?\s+([1-5]\d{2})\b/i.exec(value);
+	if (httpStatus) return statusValue(httpStatus[1]);
+	return statusValue(/\bstatus(?:\s+code)?\s*[:=]?\s*([1-5]\d{2})\b/i.exec(value)?.[1]);
 }
 
 function errorSource(firstLine: string, digest: string | undefined) {
-	const channel = firstLine.match(/^\[(browser|client|server)\]/i)?.[1].toLowerCase();
+	const channel = /^\[(browser|client|server)\]/i.exec(firstLine)?.[1].toLowerCase();
 	if (channel === "client") return "browser";
 	if (channel) return channel;
 	return digest || /^[✖×⨯]/.test(firstLine) ? "next" : undefined;
@@ -86,6 +123,39 @@ function structuredError(line: string): ProjectConsoleError | null {
 	}
 }
 
+function errorBlock(lines: string[], index: number) {
+	const block = [lines[index]];
+	let emptyLines = 0;
+	for (let next = index + 1; next < lines.length && block.length < MAX_ERROR_LINES; next += 1) {
+		const line = lines[next];
+		if (startsError(line.trim()) || structuredError(line.trim())) break;
+
+		emptyLines = line.trim() ? 0 : emptyLines + 1;
+		if (emptyLines >= 2) break;
+		block.push(line);
+	}
+	return block.join("\n").trim();
+}
+
+function unstructuredError(lines: string[], index: number): ProjectConsoleError | null {
+	const firstLine = lines[index].trim();
+	if (!startsError(firstLine)) return null;
+
+	const raw = errorBlock(lines, index);
+	if (!raw) return null;
+	const digest = /\bdigest:\s*["']?([^"'\s,}]+)/i.exec(raw)?.[1];
+	const statusCode = statusFromText(raw);
+	if (!shouldCaptureApiError(statusCode ? "api" : undefined, statusCode)) return null;
+	return {
+		message: firstLine,
+		raw,
+		source: statusCode ? "api" : errorSource(firstLine, digest),
+		routeType: /server action/i.test(raw) ? "action" : undefined,
+		digest,
+		statusCode,
+	};
+}
+
 export function extractConsoleErrors(output: string): ProjectConsoleError[] {
 	const lines = cleanTerminalOutput(output).split("\n");
 	const errors: ProjectConsoleError[] = [];
@@ -99,33 +169,8 @@ export function extractConsoleErrors(output: string): ProjectConsoleError[] {
 			}
 			continue;
 		}
-		if (!ERROR_START.test(firstLine)) continue;
-
-		const block = [lines[index]];
-		let emptyLines = 0;
-		for (let next = index + 1; next < lines.length && block.length < MAX_ERROR_LINES; next += 1) {
-			const line = lines[next];
-			if (ERROR_START.test(line.trim()) || structuredError(line.trim())) break;
-
-			emptyLines = line.trim() ? 0 : emptyLines + 1;
-			if (emptyLines >= 2) break;
-			block.push(line);
-		}
-
-		const raw = block.join("\n").trim();
-		if (raw && !errors.some((error) => error.raw === raw)) {
-			const digest = raw.match(/\bdigest:\s*["']?([^"'\s,}]+)/i)?.[1];
-			const statusCode = statusFromText(raw);
-			if (!shouldCaptureApiError(statusCode ? "api" : undefined, statusCode)) continue;
-			errors.push({
-				message: firstLine,
-				raw,
-				source: statusCode ? "api" : errorSource(firstLine, digest),
-				routeType: /server action/i.test(raw) ? "action" : undefined,
-				digest,
-				statusCode,
-			});
-		}
+		const error = unstructuredError(lines, index);
+		if (error && !errors.some((candidate) => candidate.raw === error.raw)) errors.push(error);
 	}
 
 	return errors;
