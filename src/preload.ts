@@ -46,11 +46,15 @@ const projectMonitor: ProjectMonitorApi = {
 			});
 			ipcRenderer.send("project-monitor:run-snapshots", requestId, runIds);
 		}),
-	stopProjectCommand: (runId) => ipcRenderer.invoke("project-monitor:stop-command", runId),
+	stopProjectCommand: (runId, timeoutSeconds) =>
+		ipcRenderer.invoke("project-monitor:stop-command", runId, timeoutSeconds),
 	writeProjectTerminal: (runId, data) =>
 		ipcRenderer.send("project-monitor:terminal-write", runId, data),
 	resizeProjectTerminal: (runId, cols, rows) =>
 		ipcRenderer.send("project-monitor:terminal-resize", runId, cols, rows),
+	getMonitorSettings: () => ipcRenderer.invoke("project-monitor:monitor-settings"),
+	saveMonitorSettings: (settings) =>
+		ipcRenderer.invoke("project-monitor:save-monitor-settings", settings),
 	readProjectConsoleErrors: (date) =>
 		ipcRenderer.invoke("project-monitor:read-console-errors", date),
 	getProjectConsoleErrorLogDirectory: () =>

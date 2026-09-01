@@ -6,7 +6,9 @@ import { useEffect, useRef } from "react";
 import type { MonitorPanel } from "../../projects/project-context";
 
 interface ProjectTerminalProps {
+	autoScroll: boolean;
 	panel: MonitorPanel;
+	scrollback: number;
 }
 
 function readTheme(): ITheme {
@@ -19,10 +21,12 @@ function readTheme(): ITheme {
 	};
 }
 
-export function ProjectTerminal({ panel }: Readonly<ProjectTerminalProps>) {
+export function ProjectTerminal({ autoScroll, panel, scrollback }: Readonly<ProjectTerminalProps>) {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const terminalRef = useRef<Terminal | null>(null);
 	const writtenRef = useRef(panel.outputOffset);
+	const autoScrollRef = useRef(autoScroll);
+	const followingRef = useRef(true);
 	const active = panel.status === "running" || panel.status === "stopping";
 
 	useEffect(() => {
@@ -37,7 +41,7 @@ export function ProjectTerminal({ panel }: Readonly<ProjectTerminalProps>) {
 			fontFamily: '"Kode Mono Variable", monospace',
 			fontSize: 11,
 			lineHeight: 1.25,
-			scrollback: 5_000,
+			scrollback,
 			theme: readTheme(),
 		});
 		const fit = new FitAddon();
@@ -71,12 +75,16 @@ export function ProjectTerminal({ panel }: Readonly<ProjectTerminalProps>) {
 		const input = terminal.onData((data) => {
 			if (active) window.projectMonitor.writeProjectTerminal(panel.id, data);
 		});
+		const scroll = terminal.onScroll(() => {
+			followingRef.current = terminal.buffer.active.viewportY >= terminal.buffer.active.baseY;
+		});
 
 		return () => {
 			cancelAnimationFrame(frame);
 			resizeObserver.disconnect();
 			themeObserver.disconnect();
 			input.dispose();
+			scroll.dispose();
 			terminal.dispose();
 			terminalRef.current = null;
 		};
@@ -87,14 +95,32 @@ export function ProjectTerminal({ panel }: Readonly<ProjectTerminalProps>) {
 		if (!terminal) return;
 
 		const availableStart = panel.outputOffset;
+		const viewportY = terminal.buffer.active.viewportY;
+		const follow = autoScrollRef.current && followingRef.current;
+		const afterWrite = () => {
+			if (follow) terminal.scrollToBottom();
+			else if (!autoScrollRef.current) terminal.scrollToLine(viewportY);
+		};
 		if (writtenRef.current < availableStart) {
 			terminal.reset();
-			terminal.write(panel.output);
+			terminal.write(panel.output, afterWrite);
 		} else {
-			terminal.write(panel.output.slice(writtenRef.current - availableStart));
+			terminal.write(panel.output.slice(writtenRef.current - availableStart), afterWrite);
 		}
 		writtenRef.current = availableStart + panel.output.length;
 	}, [panel.output, panel.outputOffset]);
+
+	useEffect(() => {
+		autoScrollRef.current = autoScroll;
+		if (autoScroll) {
+			followingRef.current = true;
+			terminalRef.current?.scrollToBottom();
+		}
+	}, [autoScroll]);
+
+	useEffect(() => {
+		if (terminalRef.current) terminalRef.current.options.scrollback = scrollback;
+	}, [scrollback]);
 
 	useEffect(() => {
 		const terminal = terminalRef.current;

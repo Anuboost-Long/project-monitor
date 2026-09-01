@@ -20,12 +20,16 @@ interface SettingOption {
 interface SettingSelectProps {
 	defaultValue: string;
 	id: string;
+	onChange?: (value: string) => void;
 	options: readonly SettingOption[];
+	value?: string;
 }
 
 interface SettingToggleProps {
+	checked?: boolean;
 	defaultChecked?: boolean;
 	id: string;
+	onChange?: (checked: boolean) => void;
 }
 
 export function SettingRow({ children, description, id, title }: Readonly<SettingRowProps>) {
@@ -42,13 +46,20 @@ export function SettingRow({ children, description, id, title }: Readonly<Settin
 	);
 }
 
-export function SettingSelect({ defaultValue, id, options }: Readonly<SettingSelectProps>) {
-	const [value, setValue] = useState(defaultValue);
+export function SettingSelect({
+	defaultValue,
+	id,
+	onChange,
+	options,
+	value,
+}: Readonly<SettingSelectProps>) {
+	const [internalValue, setInternalValue] = useState(defaultValue);
 	const [open, setOpen] = useState(false);
 	const rootRef = useRef<HTMLDivElement>(null);
 	const triggerRef = useRef<HTMLButtonElement>(null);
 	const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
-	const selectedIndex = options.findIndex((option) => option.value === value);
+	const selectedValue = value ?? internalValue;
+	const selectedIndex = options.findIndex((option) => option.value === selectedValue);
 
 	useEffect(() => {
 		if (!open) return;
@@ -67,7 +78,8 @@ export function SettingSelect({ defaultValue, id, options }: Readonly<SettingSel
 	};
 
 	const selectOption = (nextValue: string) => {
-		setValue(nextValue);
+		setInternalValue(nextValue);
+		onChange?.(nextValue);
 		setOpen(false);
 		requestAnimationFrame(() => triggerRef.current?.focus());
 	};
@@ -130,8 +142,8 @@ export function SettingSelect({ defaultValue, id, options }: Readonly<SettingSel
 							}}
 							type="button"
 							role="option"
-							aria-selected={option.value === value}
-							tabIndex={option.value === value ? 0 : -1}
+							aria-selected={option.value === selectedValue}
+							tabIndex={option.value === selectedValue ? 0 : -1}
 							onClick={() => selectOption(option.value)}
 							onKeyDown={(event) => {
 								switch (event.key) {
@@ -161,7 +173,7 @@ export function SettingSelect({ defaultValue, id, options }: Readonly<SettingSel
 							className={clsx(
 								"block min-h-9 w-full rounded-sm px-2.5 text-left text-[11px] text-app-ink",
 								"transition-colors hover:bg-app-soft focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-app-focus",
-								option.value === value && "bg-app-soft",
+								option.value === selectedValue && "bg-app-soft",
 							)}
 						>
 							{option.label}
@@ -173,13 +185,19 @@ export function SettingSelect({ defaultValue, id, options }: Readonly<SettingSel
 	);
 }
 
-export function SettingToggle({ defaultChecked = false, id }: Readonly<SettingToggleProps>) {
+export function SettingToggle({
+	checked,
+	defaultChecked = false,
+	id,
+	onChange,
+}: Readonly<SettingToggleProps>) {
 	return (
 		<label className="inline-flex min-h-10 cursor-pointer items-center" htmlFor={id}>
 			<input
 				id={id}
 				type="checkbox"
-				defaultChecked={defaultChecked}
+				{...(checked === undefined ? { defaultChecked } : { checked })}
+				onChange={(event) => onChange?.(event.target.checked)}
 				aria-labelledby={`${id}-label`}
 				aria-describedby={`${id}-description`}
 				className="peer sr-only"

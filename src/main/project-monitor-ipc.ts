@@ -5,13 +5,27 @@ import { appendFile, mkdir, readFile, realpath, stat, writeFile } from "node:fs/
 import { homedir } from "node:os";
 import path from "node:path";
 
-import { app, BrowserWindow, dialog, ipcMain, shell as electronShell } from "electron";
+import {
+	app,
+	BrowserWindow,
+	dialog,
+	ipcMain,
+	Notification,
+	shell as electronShell,
+} from "electron";
 import { spawn, type IPty } from "node-pty";
 
-import { createErrorWebhookBody, ERROR_WEBHOOK_CONTENT_TYPE } from "../shared/project-monitor";
+import {
+	createErrorWebhookBody,
+	DEFAULT_MONITOR_SETTINGS,
+	ERROR_WEBHOOK_CONTENT_TYPE,
+} from "../shared/project-monitor";
 import type {
+	CommandExitNotifications,
 	ErrorWebhookDeliveryResult,
 	ErrorWebhookSettings,
+	MonitorColumns,
+	MonitorSettings,
 	ProjectConsoleError,
 	ProjectConsoleErrorRecord,
 	ProjectPackageManager,
@@ -28,6 +42,7 @@ const runOutputOffsets = new Map<string, number>();
 const runErrors = new Map<string, ProjectConsoleError[]>();
 const runErrorSaveTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const savedRunErrors = new Map<string, Map<string, string>>();
+const requestedStops = new Set<string>();
 const MAX_CAPTURE_LENGTH = 100_000;
 const ERROR_SAVE_DELAY = 400;
 const monitorSessionId = randomUUID();
@@ -45,6 +60,68 @@ async function readSettings(): Promise<Record<string, unknown>> {
 		if ((error as NodeJS.ErrnoException).code === "ENOENT") return {};
 		throw error;
 	}
+}
+
+function monitorSetting<T>(value: unknown, allowed: readonly T[], fallback: T): T {
+	return allowed.includes(value as T) ? (value as T) : fallback;
+}
+
+function monitorBoolean(value: unknown, fallback: boolean) {
+	return typeof value === "boolean" ? value : fallback;
+}
+
+function validateMonitorSettings(value: unknown): MonitorSettings {
+	const setting = typeof value === "object" && value !== null ? value : {};
+	return {
+		defaultColumns: monitorSetting<MonitorColumns>(
+			Reflect.get(setting, "defaultColumns"),
+			["auto", 1, 2, 3],
+			DEFAULT_MONITOR_SETTINGS.defaultColumns,
+		),
+		restoreMonitorWall: monitorBoolean(
+			Reflect.get(setting, "restoreMonitorWall"),
+			DEFAULT_MONITOR_SETTINGS.restoreMonitorWall,
+		),
+		restartPreviousCommands: monitorBoolean(
+			Reflect.get(setting, "restartPreviousCommands"),
+			DEFAULT_MONITOR_SETTINGS.restartPreviousCommands,
+		),
+		autoScrollTerminal: monitorBoolean(
+			Reflect.get(setting, "autoScrollTerminal"),
+			DEFAULT_MONITOR_SETTINGS.autoScrollTerminal,
+		),
+		terminalScrollback: monitorSetting(
+			Reflect.get(setting, "terminalScrollback"),
+			[5_000, 10_000, 25_000, 50_000],
+			DEFAULT_MONITOR_SETTINGS.terminalScrollback,
+		),
+		commandExitNotifications: monitorSetting<CommandExitNotifications>(
+			Reflect.get(setting, "commandExitNotifications"),
+			["failures", "all", "off"],
+			DEFAULT_MONITOR_SETTINGS.commandExitNotifications,
+		),
+		restartFailedCommands: monitorBoolean(
+			Reflect.get(setting, "restartFailedCommands"),
+			DEFAULT_MONITOR_SETTINGS.restartFailedCommands,
+		),
+		commandStopTimeout: monitorSetting(
+			Reflect.get(setting, "commandStopTimeout"),
+			[3, 5, 10, 30],
+			DEFAULT_MONITOR_SETTINGS.commandStopTimeout,
+		),
+	};
+}
+
+async function getMonitorSettings() {
+	return validateMonitorSettings((await readSettings()).monitor);
+}
+
+async function saveMonitorSettings(value: unknown) {
+	const monitor = validateMonitorSettings(value);
+	const settings = await readSettings();
+	await mkdir(path.dirname(settingsPath()), { recursive: true });
+	await writeFile(settingsPath(), JSON.stringify({ ...settings, monitor }, null, 2), "utf8");
+	return monitor;
 }
 
 function validateErrorWebhookSettings(value: unknown): ErrorWebhookSettings {
@@ -478,7 +555,7 @@ async function inspectProject(projectPath: string): Promise<SyncedProject> {
 	};
 }
 
-function stopRun(runId: string) {
+function forceStopRun(runId: string) {
 	const terminal = runs.get(runId);
 	if (!terminal) return;
 
@@ -496,9 +573,107 @@ function stopRun(runId: string) {
 	runs.delete(runId);
 }
 
+function processIsRunning(pid: number) {
+	try {
+		process.kill(pid, 0);
+		return true;
+	} catch (error) {
+		return (error as NodeJS.ErrnoException).code !== "ESRCH";
+	}
+}
+
+function waitForProcessTree(pids: number[], timeoutSeconds: number) {
+	return new Promise<boolean>((resolve) => {
+		const check = () => {
+			if (pids.some(processIsRunning)) return;
+			clearInterval(interval);
+			clearTimeout(timeout);
+			resolve(true);
+		};
+		const interval = setInterval(check, 50);
+		const timeout = setTimeout(() => {
+			clearInterval(interval);
+			resolve(false);
+		}, timeoutSeconds * 1_000);
+		check();
+	});
+}
+
+function waitForTerminalExit(terminal: IPty, timeoutSeconds: number) {
+	return new Promise<boolean>((resolve) => {
+		const cleanup: {
+			listener?: { dispose: () => void };
+			timeout?: ReturnType<typeof setTimeout>;
+		} = {};
+		const finish = (exited: boolean) => {
+			cleanup.listener?.dispose();
+			if (cleanup.timeout) clearTimeout(cleanup.timeout);
+			resolve(exited);
+		};
+		cleanup.listener = terminal.onExit(() => finish(true));
+		cleanup.timeout = setTimeout(() => finish(false), timeoutSeconds * 1_000);
+	});
+}
+
+async function stopRun(runId: string, timeoutSeconds: number) {
+	const terminal = runs.get(runId);
+	if (!terminal) return;
+	requestedStops.add(runId);
+
+	if (process.platform === "win32") {
+		const exit = waitForTerminalExit(terminal, timeoutSeconds);
+		terminal.write("\x03");
+		if (!(await exit)) terminal.kill();
+		return;
+	}
+
+	const pids = processTree(terminal.pid);
+	for (const pid of pids) {
+		try {
+			process.kill(pid, "SIGTERM");
+		} catch {
+			continue;
+		}
+	}
+	if (await waitForProcessTree(pids, timeoutSeconds)) return;
+
+	for (const pid of pids.filter(processIsRunning)) {
+		try {
+			process.kill(pid, "SIGKILL");
+		} catch {
+			continue;
+		}
+	}
+	runs.delete(runId);
+}
+
+async function showCommandExitNotification(projectName: string, command: string, exitCode: number) {
+	let commandExitNotifications: CommandExitNotifications;
+	try {
+		({ commandExitNotifications } = await getMonitorSettings());
+	} catch {
+		return;
+	}
+	if (
+		!Notification.isSupported() ||
+		commandExitNotifications === "off" ||
+		(commandExitNotifications === "failures" && exitCode === 0)
+	) {
+		return;
+	}
+
+	new Notification({
+		title: exitCode === 0 ? `${projectName} finished` : `${projectName} failed`,
+		body: `${command} exited with code ${exitCode}.`,
+	}).show();
+}
+
 export function registerProjectMonitorIpc() {
 	app.once("before-quit", () => {
-		for (const runId of runs.keys()) stopRun(runId);
+		for (const runId of runs.keys()) {
+			requestedStops.add(runId);
+			forceStopRun(runId);
+		}
 		for (const timer of runErrorSaveTimers.values()) clearTimeout(timer);
 		runOutput.clear();
 		runOutputOffsets.clear();
@@ -611,6 +786,7 @@ export function registerProjectMonitorIpc() {
 				}
 			});
 			terminal.onExit(({ exitCode }) => {
+				const stopped = requestedStops.delete(request.runId);
 				const saveTimer = runErrorSaveTimers.get(request.runId);
 				if (saveTimer) clearTimeout(saveTimer);
 				saveDetectedErrors(request.runId, project, displayCommand, runErrors.get(request.runId) ?? []);
@@ -621,13 +797,17 @@ export function registerProjectMonitorIpc() {
 				runErrorSaveTimers.delete(request.runId);
 				savedRunErrors.delete(request.runId);
 				send({ runId: request.runId, type: "exit", exitCode });
+				if (!stopped) void showCommandExitNotification(project.name, displayCommand, exitCode);
 			});
 		},
 	);
 
-	ipcMain.handle("project-monitor:stop-command", (_event, runId: string) => {
-		stopRun(runId);
-	});
+	ipcMain.handle("project-monitor:stop-command", (_event, runId: string, timeoutSeconds: number) =>
+		stopRun(
+			runId,
+			monitorSetting(timeoutSeconds, [3, 5, 10, 30], DEFAULT_MONITOR_SETTINGS.commandStopTimeout),
+		),
+	);
 
 	ipcMain.handle("project-monitor:read-console-errors", (_event, date: string) =>
 		readConsoleErrors(date),
@@ -637,6 +817,10 @@ export function registerProjectMonitorIpc() {
 		chooseErrorLogDirectory(event),
 	);
 	ipcMain.handle("project-monitor:open-console-error-log-directory", () => openErrorLogDirectory());
+	ipcMain.handle("project-monitor:monitor-settings", () => getMonitorSettings());
+	ipcMain.handle("project-monitor:save-monitor-settings", (_event, settings: unknown) =>
+		saveMonitorSettings(settings),
+	);
 	ipcMain.handle("project-monitor:error-webhook-settings", () => getErrorWebhookSettings());
 	ipcMain.handle("project-monitor:save-error-webhook-settings", (_event, settings: unknown) =>
 		saveErrorWebhookSettings(settings),

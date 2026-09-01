@@ -9,10 +9,14 @@ import {
 } from "react";
 
 import type {
+	MonitorSettings,
 	ProjectConsoleError,
 	ProjectRunKind,
+	ProjectRunRequest,
+	ProjectRunSnapshot,
 	SyncedProject,
 } from "../../../shared/project-monitor";
+import { DEFAULT_MONITOR_SETTINGS } from "../../../shared/project-monitor";
 
 const PROJECTS_STORAGE_KEY = "project-monitor-projects";
 const PANELS_STORAGE_KEY = "project-monitor-panel-session";
@@ -26,6 +30,7 @@ export interface MonitorPanel {
 	id: string;
 	slot: number;
 	projectId: string;
+	projectPath: string;
 	projectName: string;
 	kind: ProjectRunKind;
 	label: string;
@@ -50,6 +55,9 @@ interface ProjectMonitorContextValue {
 	projects: SyncedProject[];
 	panels: MonitorPanel[];
 	busyRunIds: string[];
+	monitorSettings: MonitorSettings;
+	monitorSettingsLoaded: boolean;
+	updateMonitorSettings: (settings: Partial<MonitorSettings>) => Promise<void>;
 	syncProjects: () => Promise<SyncedProject[]>;
 	resyncProject: (projectPath: string) => Promise<void>;
 	removeProject: (projectPath: string) => void;
@@ -68,27 +76,37 @@ interface StoredPanelSession {
 	panels: MonitorPanel[];
 }
 
-function readStoredPanels(): MonitorPanel[] {
+function readStoredPanels(): StoredPanelSession {
 	const sessionId = window.projectMonitor.sessionId;
-	if (!sessionId) return [];
+	if (!sessionId) return { sessionId: "", panels: [] };
 
 	try {
 		const stored = JSON.parse(
 			globalThis.localStorage.getItem(PANELS_STORAGE_KEY) ?? "null",
 		) as StoredPanelSession | null;
-		if (stored?.sessionId !== sessionId || !Array.isArray(stored.panels)) {
+		if (!stored || !Array.isArray(stored.panels)) {
 			globalThis.localStorage.removeItem(PANELS_STORAGE_KEY);
-			return [];
+			return { sessionId, panels: [] };
 		}
-		return stored.panels.filter(
-			(panel) =>
-				typeof panel?.id === "string" &&
-				typeof panel.slot === "number" &&
-				typeof panel.output === "string",
-		);
+		return {
+			sessionId: stored.sessionId,
+			panels: stored.panels
+				.filter(
+					(panel) =>
+						typeof panel?.id === "string" &&
+						typeof panel.slot === "number" &&
+						typeof panel.projectId === "string" &&
+						typeof panel.label === "string" &&
+						typeof panel.output === "string",
+				)
+				.map((panel) => ({
+					...panel,
+					projectPath: typeof panel.projectPath === "string" ? panel.projectPath : panel.projectId,
+				})),
+		};
 	} catch {
 		globalThis.localStorage.removeItem(PANELS_STORAGE_KEY);
-		return [];
+		return { sessionId, panels: [] };
 	}
 }
 
@@ -131,11 +149,25 @@ function appendOutput(panel: MonitorPanel, data: string): MonitorPanel {
 	};
 }
 
+function panelRunRequest(panel: MonitorPanel): ProjectRunRequest {
+	return {
+		runId: panel.id,
+		projectPath: panel.projectPath,
+		kind: panel.kind,
+		value: panel.kind === "script" ? panel.label : "",
+	};
+}
+
 export function ProjectMonitorProvider({ children }: Readonly<{ children: ReactNode }>) {
 	const [projects, setProjects] = useState(readStoredProjects);
-	const [panels, setPanels] = useState(readStoredPanels);
+	const [panels, setPanels] = useState<MonitorPanel[]>([]);
 	const [busyRunIds, setBusyRunIds] = useState<string[]>([]);
+	const [monitorSettings, setMonitorSettings] = useState(DEFAULT_MONITOR_SETTINGS);
+	const [monitorSettingsLoaded, setMonitorSettingsLoaded] = useState(false);
 	const panelsRef = useRef(panels);
+	const monitorSettingsRef = useRef(monitorSettings);
+	const settingsSaveRef = useRef(Promise.resolve());
+	const stoppingRunIdsRef = useRef(new Set<string>());
 	const panelRevisionRef = useRef(0);
 	const savedPanelRevisionRef = useRef(-1);
 	const shellRunKey = panels
@@ -154,6 +186,11 @@ export function ProjectMonitorProvider({ children }: Readonly<{ children: ReactN
 			persistPanels(panelsRef.current);
 			savedPanelRevisionRef.current = panelRevisionRef.current;
 		};
+		if (!monitorSettingsLoaded) return;
+		if (!monitorSettings.restoreMonitorWall) {
+			globalThis.localStorage.removeItem(PANELS_STORAGE_KEY);
+			return;
+		}
 		save();
 		const timer = setInterval(save, PANEL_SAVE_INTERVAL);
 		globalThis.addEventListener("beforeunload", save);
@@ -162,38 +199,53 @@ export function ProjectMonitorProvider({ children }: Readonly<{ children: ReactN
 			globalThis.removeEventListener("beforeunload", save);
 			save();
 		};
-	}, []);
+	}, [monitorSettings.restoreMonitorWall, monitorSettingsLoaded]);
 
 	useEffect(() => {
-		const restorable = panelsRef.current.filter(
-			(panel) => panel.status === "running" || panel.status === "stopping",
-		);
-		if (
-			!window.projectMonitor.supportsRunSnapshots ||
-			!window.projectMonitor.getProjectCommandSnapshots ||
-			restorable.length === 0
-		) {
-			return;
-		}
-
 		let active = true;
-		const restore = async () => {
-			let snapshots;
+		const load = async () => {
+			let settings = DEFAULT_MONITOR_SETTINGS;
 			try {
-				snapshots = await window.projectMonitor.getProjectCommandSnapshots?.(
-					restorable.map((panel) => panel.id),
-				);
+				settings = await window.projectMonitor.getMonitorSettings();
 			} catch {
+				settings = DEFAULT_MONITOR_SETTINGS;
+			}
+			if (!active) return;
+			monitorSettingsRef.current = settings;
+			setMonitorSettings(settings);
+
+			if (!settings.restoreMonitorWall) {
+				globalThis.localStorage.removeItem(PANELS_STORAGE_KEY);
+				setMonitorSettingsLoaded(true);
 				return;
 			}
-			if (!active || !snapshots) return;
-			const byRunId = new Map(snapshots.map((snapshot) => [snapshot.runId, snapshot]));
-			setPanels((current) =>
-				current.map((panel) => {
+
+			const stored = readStoredPanels();
+			let restoredPanels = stored.panels;
+			const sameSession = stored.sessionId === window.projectMonitor.sessionId;
+			const restorable = restoredPanels.filter(
+				(panel) => panel.status === "running" || panel.status === "stopping",
+			);
+			if (
+				sameSession &&
+				window.projectMonitor.supportsRunSnapshots &&
+				window.projectMonitor.getProjectCommandSnapshots &&
+				restorable.length > 0
+			) {
+				let snapshots: ProjectRunSnapshot[] = [];
+				try {
+					snapshots = await window.projectMonitor.getProjectCommandSnapshots(
+						restorable.map((panel) => panel.id),
+					);
+				} catch {
+					snapshots = [];
+				}
+				if (!active) return;
+				const byRunId = new Map(snapshots.map((snapshot) => [snapshot.runId, snapshot]));
+				restoredPanels = restoredPanels.map((panel) => {
 					if (panel.status !== "running" && panel.status !== "stopping") return panel;
 					const snapshot = byRunId.get(panel.id);
 					if (!snapshot) return { ...panel, status: "stopped" };
-
 					const header =
 						panel.kind === "script" && snapshot.outputOffset === 0 ? `$ ${panel.command}\r\n\r\n` : "";
 					const combined = `${header}${snapshot.output}`;
@@ -204,11 +256,39 @@ export function ProjectMonitorProvider({ children }: Readonly<{ children: ReactN
 						outputOffset: snapshot.outputOffset + combined.length - output.length,
 						errors: snapshot.errors,
 					};
-				}),
-			);
+				});
+			} else if (!sameSession) {
+				restoredPanels = restoredPanels.map((panel) => ({
+					...panel,
+					exitCode: settings.restartPreviousCommands ? null : panel.exitCode,
+					status: settings.restartPreviousCommands
+						? "running"
+						: panel.status === "running" || panel.status === "stopping"
+							? "stopped"
+							: panel.status,
+				}));
+			}
+
+			panelsRef.current = restoredPanels;
+			setPanels(restoredPanels);
+			setMonitorSettingsLoaded(true);
+			if (!sameSession && settings.restartPreviousCommands) {
+				for (const panel of restoredPanels) {
+					void window.projectMonitor.runProjectCommand(panelRunRequest(panel)).catch((error) => {
+						const message = error instanceof Error ? error.message : "The terminal could not restart.";
+						setPanels((current) =>
+							current.map((candidate) =>
+								candidate.id === panel.id
+									? { ...appendOutput(candidate, `${message}\r\n`), status: "error" }
+									: candidate,
+							),
+						);
+					});
+				}
+			}
 		};
 
-		void restore();
+		void load();
 		return () => {
 			active = false;
 		};
@@ -217,6 +297,13 @@ export function ProjectMonitorProvider({ children }: Readonly<{ children: ReactN
 	useEffect(
 		() =>
 			window.projectMonitor.onProjectRunEvent((event) => {
+				const currentPanel = panelsRef.current.find((panel) => panel.id === event.runId);
+				const restart =
+					event.type === "exit" &&
+					event.exitCode !== 0 &&
+					monitorSettingsRef.current.restartFailedCommands &&
+					!stoppingRunIdsRef.current.has(event.runId) &&
+					currentPanel;
 				setPanels((current) =>
 					current.map((panel) => {
 						if (panel.id !== event.runId) return panel;
@@ -229,7 +316,8 @@ export function ProjectMonitorProvider({ children }: Readonly<{ children: ReactN
 						}
 
 						let status: MonitorStatus;
-						if (panel.status === "stopping" || panel.status === "stopped") status = "stopped";
+						if (restart) status = "running";
+						else if (panel.status === "stopping" || panel.status === "stopped") status = "stopped";
 						else status = event.exitCode === 0 ? "done" : "error";
 						return {
 							...panel,
@@ -238,6 +326,20 @@ export function ProjectMonitorProvider({ children }: Readonly<{ children: ReactN
 						};
 					}),
 				);
+				if (event.type !== "exit") return;
+				stoppingRunIdsRef.current.delete(event.runId);
+				if (restart) {
+					void window.projectMonitor.runProjectCommand(panelRunRequest(restart)).catch((error) => {
+						const message = error instanceof Error ? error.message : "The terminal could not restart.";
+						setPanels((current) =>
+							current.map((panel) =>
+								panel.id === restart.id
+									? { ...appendOutput(panel, `${message}\r\n`), status: "error" }
+									: panel,
+							),
+						);
+					});
+				}
 			}),
 		[],
 	);
@@ -321,15 +423,31 @@ export function ProjectMonitorProvider({ children }: Readonly<{ children: ReactN
 		});
 	};
 
+	const updateMonitorSettings = (changes: Partial<MonitorSettings>): Promise<void> => {
+		const next = { ...monitorSettingsRef.current, ...changes };
+		if (changes.restoreMonitorWall === false) {
+			globalThis.localStorage.removeItem(PANELS_STORAGE_KEY);
+		}
+		monitorSettingsRef.current = next;
+		setMonitorSettings(next);
+		const save = settingsSaveRef.current.then(() => window.projectMonitor.saveMonitorSettings(next));
+		settingsSaveRef.current = save.then<void>(
+			() => undefined,
+			() => undefined,
+		);
+		return save.then<void>(() => undefined);
+	};
+
 	const startMonitor = async ({ slot, project, kind, value }: StartMonitorInput) => {
 		const runId = globalThis.crypto.randomUUID();
 		const command =
 			kind === "script" ? `${project.packageManager} run ${value}` : "Interactive shell";
-		setPanels((current) => [
-			{
+		setPanels((current) => {
+			const panel: MonitorPanel = {
 				id: runId,
 				slot,
 				projectId: project.id,
+				projectPath: project.path,
 				projectName: project.name,
 				kind,
 				label: kind === "script" ? value : "Terminal",
@@ -340,9 +458,11 @@ export function ProjectMonitorProvider({ children }: Readonly<{ children: ReactN
 				status: "running",
 				exitCode: null,
 				errors: [],
-			},
-			...current,
-		]);
+			};
+			const next = [panel, ...current];
+			panelsRef.current = next;
+			return next;
+		});
 
 		try {
 			await window.projectMonitor.runProjectCommand({
@@ -362,10 +482,14 @@ export function ProjectMonitorProvider({ children }: Readonly<{ children: ReactN
 	};
 
 	const stopMonitor = async (runId: string) => {
+		stoppingRunIdsRef.current.add(runId);
 		setPanels((current) =>
 			current.map((panel) => (panel.id === runId ? { ...panel, status: "stopping" } : panel)),
 		);
-		await window.projectMonitor.stopProjectCommand(runId);
+		await window.projectMonitor.stopProjectCommand(
+			runId,
+			monitorSettingsRef.current.commandStopTimeout,
+		);
 		setPanels((current) =>
 			current.map((panel) =>
 				panel.id === runId && panel.status === "stopping" ? { ...panel, status: "stopped" } : panel,
@@ -401,7 +525,11 @@ export function ProjectMonitorProvider({ children }: Readonly<{ children: ReactN
 	const clearMonitor = async (runId: string) => {
 		const panel = panels.find((candidate) => candidate.id === runId);
 		if (panel?.status === "running" || panel?.status === "stopping") {
-			await window.projectMonitor.stopProjectCommand(runId);
+			stoppingRunIdsRef.current.add(runId);
+			await window.projectMonitor.stopProjectCommand(
+				runId,
+				monitorSettingsRef.current.commandStopTimeout,
+			);
 		}
 		setPanels((current) => current.filter((candidate) => candidate.id !== runId));
 	};
@@ -410,6 +538,9 @@ export function ProjectMonitorProvider({ children }: Readonly<{ children: ReactN
 			projects,
 			panels,
 			busyRunIds,
+			monitorSettings,
+			monitorSettingsLoaded,
+			updateMonitorSettings,
 			syncProjects,
 			resyncProject,
 			removeProject,
@@ -424,6 +555,9 @@ export function ProjectMonitorProvider({ children }: Readonly<{ children: ReactN
 			projects,
 			panels,
 			busyRunIds,
+			monitorSettings,
+			monitorSettingsLoaded,
+			updateMonitorSettings,
 			syncProjects,
 			resyncProject,
 			removeProject,

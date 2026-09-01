@@ -11,6 +11,31 @@ export interface SyncedProject {
 
 export type ProjectRunKind = "script" | "shell";
 
+export type MonitorColumns = "auto" | 1 | 2 | 3;
+export type CommandExitNotifications = "failures" | "all" | "off";
+
+export interface MonitorSettings {
+	defaultColumns: MonitorColumns;
+	restoreMonitorWall: boolean;
+	restartPreviousCommands: boolean;
+	autoScrollTerminal: boolean;
+	terminalScrollback: number;
+	commandExitNotifications: CommandExitNotifications;
+	restartFailedCommands: boolean;
+	commandStopTimeout: number;
+}
+
+export const DEFAULT_MONITOR_SETTINGS: MonitorSettings = {
+	defaultColumns: "auto",
+	restoreMonitorWall: true,
+	restartPreviousCommands: false,
+	autoScrollTerminal: true,
+	terminalScrollback: 10_000,
+	commandExitNotifications: "failures",
+	restartFailedCommands: false,
+	commandStopTimeout: 5,
+};
+
 export interface ProjectRunRequest {
 	runId: string;
 	projectPath: string;
@@ -92,9 +117,11 @@ export interface ProjectMonitorApi {
 	runProjectCommand: (request: ProjectRunRequest) => Promise<void>;
 	getActiveProjectCommands: (runIds: string[]) => Promise<string[]>;
 	getProjectCommandSnapshots?: (runIds: string[]) => Promise<ProjectRunSnapshot[]>;
-	stopProjectCommand: (runId: string) => Promise<void>;
+	stopProjectCommand: (runId: string, timeoutSeconds: number) => Promise<void>;
 	writeProjectTerminal: (runId: string, data: string) => void;
 	resizeProjectTerminal: (runId: string, cols: number, rows: number) => void;
+	getMonitorSettings: () => Promise<MonitorSettings>;
+	saveMonitorSettings: (settings: MonitorSettings) => Promise<MonitorSettings>;
 	readProjectConsoleErrors?: (date: string) => Promise<ProjectConsoleErrorRecord[]>;
 	getProjectConsoleErrorLogDirectory?: () => Promise<string>;
 	chooseProjectConsoleErrorLogDirectory?: () => Promise<string | null>;

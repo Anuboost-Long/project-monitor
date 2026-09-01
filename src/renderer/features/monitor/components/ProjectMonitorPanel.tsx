@@ -13,6 +13,7 @@ import { ProjectTerminal } from "./ProjectTerminal";
 interface ProjectMonitorPanelProps {
 	panel: MonitorPanel;
 	allowSpan: boolean;
+	autoScroll: boolean;
 	busy: boolean;
 	dragging: boolean;
 	dropTarget: boolean;
@@ -25,6 +26,7 @@ interface ProjectMonitorPanelProps {
 	onPickSize: (runId: string) => void;
 	onRename: (runId: string) => void;
 	onStop: (runId: string) => void;
+	scrollback: number;
 }
 
 const statusLabel = {
@@ -45,6 +47,7 @@ const sizeClassName = {
 export function ProjectMonitorPanel({
 	panel,
 	allowSpan,
+	autoScroll,
 	busy,
 	dragging,
 	dropTarget,
@@ -57,6 +60,7 @@ export function ProjectMonitorPanel({
 	onPickSize,
 	onRename,
 	onStop,
+	scrollback,
 }: Readonly<ProjectMonitorPanelProps>) {
 	const name = panel.title ?? panel.label;
 	const status =
@@ -166,7 +170,7 @@ export function ProjectMonitorPanel({
 					{panel.command}
 				</MonoText>
 				<div className="min-h-0 flex-1">
-					<ProjectTerminal panel={panel} />
+					<ProjectTerminal panel={panel} autoScroll={autoScroll} scrollback={scrollback} />
 				</div>
 			</div>
 		</article>

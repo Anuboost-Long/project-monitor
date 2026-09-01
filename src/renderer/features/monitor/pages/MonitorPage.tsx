@@ -34,6 +34,8 @@ export function MonitorPage() {
 		projects,
 		panels,
 		busyRunIds,
+		monitorSettings,
+		updateMonitorSettings,
 		startMonitor,
 		moveMonitor,
 		renameMonitor,
@@ -44,7 +46,7 @@ export function MonitorPage() {
 	const [setupSlot, setSetupSlot] = useState<number | null>(null);
 	const [renameRunId, setRenameRunId] = useState<string | null>(null);
 	const [sizingRunId, setSizingRunId] = useState<string | null>(null);
-	const [columns, setColumns] = useState<MonitorColumns>("auto");
+	const columns: MonitorColumns = monitorSettings.defaultColumns;
 	const [layoutOpen, setLayoutOpen] = useState(false);
 	const [draggingRunId, setDraggingRunId] = useState<string | null>(null);
 	const [dropSlot, setDropSlot] = useState<number | null>(null);
@@ -180,6 +182,8 @@ export function MonitorPage() {
 							<ProjectMonitorPanel
 								key={panel.id}
 								panel={panel}
+								autoScroll={monitorSettings.autoScrollTerminal}
+								scrollback={monitorSettings.terminalScrollback}
 								allowSpan={columns !== 1}
 								busy={
 									panel.status === "stopping" ||
@@ -251,7 +255,9 @@ export function MonitorPage() {
 			<MonitorLayoutModal
 				columns={columns}
 				open={layoutOpen}
-				onSelect={setColumns}
+				onSelect={(defaultColumns) => {
+					void updateMonitorSettings({ defaultColumns }).catch((): void => undefined);
+				}}
 				onClose={() => setLayoutOpen(false)}
 			/>
 		</div>
