@@ -82,16 +82,10 @@ typings/
 # DynamoDB Local files
 .dynamodb/
 
-# Webpack
-.webpack/
-
 # Vite
 .vite/
 dist/
 dist-electron/
-
-# Electron-Forge (legacy, no longer produced)
-out/
 
 # electron-builder
 release/
