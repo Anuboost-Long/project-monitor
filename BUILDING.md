@@ -4,6 +4,9 @@ Project Monitor packages with [electron-builder](https://www.electron.build/)
 and must be built on the operating system being targeted. The GitHub Actions
 workflow builds all three platforms on native runners.
 
+For how the build tooling is wired together, and why it moved off Electron
+Forge, see [BUILD_TOOLING.md](BUILD_TOOLING.md).
+
 ## Requirements
 
 - Node.js 22 LTS
