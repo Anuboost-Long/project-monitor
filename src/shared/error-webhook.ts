@@ -31,6 +31,42 @@ export interface ErrorWebhookBody {
 	};
 }
 
+function zoneOffset(date: Date, timeZone: string) {
+	const offset = new Intl.DateTimeFormat("en-US", { timeZone, timeZoneName: "longOffset" })
+		.formatToParts(date)
+		.find((part) => part.type === "timeZoneName")
+		?.value.replace("GMT", "");
+	return offset || "Z";
+}
+
+/**
+ * Renders an instant as an RFC 3339 timestamp in the chosen zone, keeping the
+ * instant identical and moving only its representation.
+ */
+export function zonedTimestamp(timestamp: string, timeZone: string) {
+	const date = new Date(timestamp);
+	if (!timeZone || Number.isNaN(date.getTime())) return timestamp;
+
+	try {
+		const parts = new Intl.DateTimeFormat("en-US", {
+			timeZone,
+			hourCycle: "h23",
+			year: "numeric",
+			month: "2-digit",
+			day: "2-digit",
+			hour: "2-digit",
+			minute: "2-digit",
+			second: "2-digit",
+		}).formatToParts(date);
+		const part = (type: Intl.DateTimeFormatPartTypes) =>
+			parts.find((candidate) => candidate.type === type)?.value ?? "";
+		const milliseconds = String(date.getUTCMilliseconds()).padStart(3, "0");
+		return `${part("year")}-${part("month")}-${part("day")}T${part("hour")}:${part("minute")}:${part("second")}.${milliseconds}${zoneOffset(date, timeZone)}`;
+	} catch {
+		return timestamp;
+	}
+}
+
 function redactProjectPath(value: string, projectPath: string, projectName: string) {
 	let end = projectPath.length;
 	while (end > 0 && (projectPath[end - 1] === "/" || projectPath[end - 1] === "\\")) end -= 1;
@@ -53,6 +89,7 @@ function redactProjectPath(value: string, projectPath: string, projectName: stri
 
 export function createErrorWebhookBody(
 	record: Readonly<ProjectConsoleErrorRecord>,
+	timeZone = "",
 ): ErrorWebhookBody {
 	const message = redactProjectPath(record.message, record.projectPath, record.projectName);
 	const details = redactProjectPath(record.raw, record.projectPath, record.projectName);
@@ -63,7 +100,7 @@ export function createErrorWebhookBody(
 		source: "urn:project-monitor",
 		type: "dev.project-monitor.error.detected",
 		subject: `projects/${encodeURIComponent(record.projectName)}/runs/${encodeURIComponent(record.runId)}`,
-		time: record.timestamp,
+		time: zonedTimestamp(record.timestamp, timeZone),
 		data_content_type: "application/json",
 		data: {
 			schema_version: 1,

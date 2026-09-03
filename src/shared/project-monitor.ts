@@ -71,6 +71,7 @@ export interface ErrorWebhookHeader {
 export interface ErrorWebhookSettings {
 	url: string;
 	headers: ErrorWebhookHeader[];
+	timeZone: string;
 }
 
 export interface ErrorWebhookDeliveryFailure {
@@ -135,5 +136,9 @@ export interface ProjectMonitorApi {
 	onProjectRunEvent: (callback: (event: ProjectRunEvent) => void) => () => void;
 }
 
-export { createErrorWebhookBody, ERROR_WEBHOOK_CONTENT_TYPE } from "./error-webhook";
+export {
+	createErrorWebhookBody,
+	ERROR_WEBHOOK_CONTENT_TYPE,
+	zonedTimestamp,
+} from "./error-webhook";
 export type { ErrorWebhookBody } from "./error-webhook";

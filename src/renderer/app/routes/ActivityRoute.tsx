@@ -90,13 +90,18 @@ function errorWebhookFailureMessage(result: ErrorWebhookDeliveryFailure) {
 	}
 }
 
-function ActivityErrorItem({ record }: Readonly<{ record: ProjectConsoleErrorRecord }>) {
+function ActivityErrorItem({
+	record,
+	timeZone,
+}: Readonly<{ record: ProjectConsoleErrorRecord; timeZone: string }>) {
 	const [sending, setSending] = useState(false);
 	const [notice, setNotice] = useState<{ error: boolean; text: string } | null>(null);
 
 	const copy = async () => {
 		try {
-			await navigator.clipboard.writeText(JSON.stringify(createErrorWebhookBody(record), null, 2));
+			await navigator.clipboard.writeText(
+				JSON.stringify(createErrorWebhookBody(record, timeZone), null, 2),
+			);
 			setNotice({ error: false, text: "Error body copied." });
 		} catch {
 			setNotice({ error: true, text: "The error body could not be copied." });
@@ -209,6 +214,7 @@ export function ActivityRoute() {
 	const [records, setRecords] = useState<ProjectConsoleErrorRecord[]>([]);
 	const [recordsDate, setRecordsDate] = useState(today);
 	const [logDirectory, setLogDirectory] = useState("");
+	const [timeZone, setTimeZone] = useState("");
 	const [selectedDate, setSelectedDate] = useState(today);
 	const [loading, setLoading] = useState(true);
 	const [loadError, setLoadError] = useState(false);
@@ -226,7 +232,17 @@ export function ActivityRoute() {
 			}
 		};
 
+		const loadTimeZone = async () => {
+			try {
+				const settings = await api.getErrorWebhookSettings?.();
+				if (active && settings) setTimeZone(settings.timeZone);
+			} catch {
+				return;
+			}
+		};
+
 		void loadDirectory();
+		void loadTimeZone();
 		return () => {
 			active = false;
 		};
@@ -286,7 +302,7 @@ export function ActivityRoute() {
 	let content = (
 		<div className="space-y-3">
 			{visibleRecords.slice(0, 200).map((record) => (
-				<ActivityErrorItem key={record.id} record={record} />
+				<ActivityErrorItem key={record.id} record={record} timeZone={timeZone} />
 			))}
 		</div>
 	);

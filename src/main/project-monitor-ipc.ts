@@ -125,11 +125,25 @@ async function saveMonitorSettings(value: unknown) {
 	return monitor;
 }
 
+/** Falls back to UTC rather than rejecting, so an unknown zone never costs the rest of the config. */
+function validateWebhookTimeZone(value: unknown) {
+	if (typeof value !== "string" || !value.trim()) return "";
+
+	const timeZone = value.trim();
+	try {
+		new Intl.DateTimeFormat("en-US", { timeZone });
+	} catch {
+		return "";
+	}
+	return timeZone;
+}
+
 function validateErrorWebhookSettings(value: unknown): ErrorWebhookSettings {
 	if (typeof value !== "object" || value === null) throw new Error("Invalid webhook settings");
 
 	const url = Reflect.get(value, "url");
 	const headers = Reflect.get(value, "headers");
+	const timeZone = validateWebhookTimeZone(Reflect.get(value, "timeZone"));
 	if (typeof url !== "string" || !Array.isArray(headers)) {
 		throw new TypeError("Invalid webhook settings");
 	}
@@ -166,17 +180,17 @@ function validateErrorWebhookSettings(value: unknown): ErrorWebhookSettings {
 		return { name: trimmedName, value: headerValue };
 	});
 
-	return { url: trimmedUrl, headers: normalizedHeaders };
+	return { url: trimmedUrl, headers: normalizedHeaders, timeZone };
 }
 
 async function getErrorWebhookSettings(): Promise<ErrorWebhookSettings> {
 	const settings = await readSettings();
-	if (!settings.errorWebhook) return { url: "", headers: [] };
+	if (!settings.errorWebhook) return { url: "", headers: [], timeZone: "" };
 
 	try {
 		return validateErrorWebhookSettings(settings.errorWebhook);
 	} catch {
-		return { url: "", headers: [] };
+		return { url: "", headers: [], timeZone: "" };
 	}
 }
 
@@ -268,7 +282,7 @@ async function sendErrorWebhook(
 				...Object.fromEntries(settings.headers.map((header) => [header.name, header.value])),
 				"Content-Type": ERROR_WEBHOOK_CONTENT_TYPE,
 			},
-			data: createErrorWebhookBody(record),
+			data: createErrorWebhookBody(record, settings.timeZone),
 		});
 		return { sent: true };
 	} catch (error) {

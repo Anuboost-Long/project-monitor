@@ -4,14 +4,16 @@ import {
 	TrashIcon as Trash,
 } from "@phosphor-icons/react";
 import { clsx } from "clsx";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
 	createErrorWebhookBody,
 	ERROR_WEBHOOK_CONTENT_TYPE,
 	type ErrorWebhookHeader,
+	zonedTimestamp,
 } from "../../../../shared/project-monitor";
 import { CaptionText, MonoText, OverlineText, SectionTitle } from "../../../shared/typography";
+import { SettingSelect } from "./SettingsControl";
 
 interface HeaderRow extends ErrorWebhookHeader {
 	id: string;
@@ -20,24 +22,28 @@ interface HeaderRow extends ErrorWebhookHeader {
 const inputClassName =
 	"min-h-10 w-full rounded-sm border border-app-line bg-app-paper px-3 text-xs text-app-ink outline-none transition-colors placeholder:text-app-muted/60 focus:border-app-accent focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-app-focus";
 
-const sampleBody = JSON.stringify(
-	createErrorWebhookBody({
-		id: "run_abc123:error_a1b2c3d4",
-		runId: "run_abc123",
-		projectId: "project_123",
-		projectName: "infinity_admin",
-		projectPath: "/Users/administrator/Work/infinity_admin",
-		command: "yarn dev",
-		timestamp: "2026-08-28T09:30:15.420Z",
-		message: "InputContainer is not defined",
-		raw: "[browser] Uncaught ReferenceError: InputContainer is not defined\n    at /Users/administrator/Work/infinity_admin/src/app/inf/auth/sign-in/sign-in-content.tsx:7:8",
-		source: "browser",
-		routeType: "client",
-		statusCode: 500,
-	}),
-	null,
-	2,
-);
+const sampleRecord = {
+	id: "run_abc123:error_a1b2c3d4",
+	runId: "run_abc123",
+	projectId: "project_123",
+	projectName: "infinity_admin",
+	projectPath: "/Users/administrator/Work/infinity_admin",
+	command: "yarn dev",
+	timestamp: "2026-08-28T09:30:15.420Z",
+	message: "InputContainer is not defined",
+	raw: "[browser] Uncaught ReferenceError: InputContainer is not defined\n    at /Users/administrator/Work/infinity_admin/src/app/inf/auth/sign-in/sign-in-content.tsx:7:8",
+	source: "browser",
+	routeType: "client",
+	statusCode: 500,
+};
+
+const timeZoneOptions = [
+	{ value: "", label: "UTC" },
+	...Intl.supportedValuesOf("timeZone").map((zone) => ({
+		value: zone,
+		label: zone.replaceAll("_", " "),
+	})),
+];
 
 function headerRow(header?: ErrorWebhookHeader): HeaderRow {
 	return { ...(header ?? { name: "", value: "" }), id: globalThis.crypto.randomUUID() };
@@ -63,9 +69,14 @@ function validateHeaders(rows: HeaderRow[]) {
 export function ErrorWebhookSection() {
 	const [url, setUrl] = useState("");
 	const [headers, setHeaders] = useState<HeaderRow[]>(() => [headerRow()]);
+	const [timeZone, setTimeZone] = useState("");
 	const [busy, setBusy] = useState(false);
 	const [notice, setNotice] = useState<{ error: boolean; text: string } | null>(null);
 	const [copied, setCopied] = useState(false);
+	const sampleBody = useMemo(
+		() => JSON.stringify(createErrorWebhookBody(sampleRecord, timeZone), null, 2),
+		[timeZone],
+	);
 
 	useEffect(() => {
 		let active = true;
@@ -74,6 +85,7 @@ export function ErrorWebhookSection() {
 				const settings = await window.projectMonitor.getErrorWebhookSettings?.();
 				if (!active || !settings) return;
 				setUrl(settings.url);
+				setTimeZone(settings.timeZone);
 				setHeaders(settings.headers.length ? settings.headers.map(headerRow) : [headerRow()]);
 			} catch {
 				if (active) setNotice({ error: true, text: "Webhook settings could not be loaded." });
@@ -125,8 +137,10 @@ export function ErrorWebhookSection() {
 			const settings = await window.projectMonitor.saveErrorWebhookSettings({
 				url: trimmedUrl,
 				headers: validatedHeaders,
+				timeZone,
 			});
 			setUrl(settings.url);
+			setTimeZone(settings.timeZone);
 			setHeaders(settings.headers.length ? settings.headers.map(headerRow) : [headerRow()]);
 			setNotice({ error: false, text: "Webhook settings saved." });
 		} catch {
@@ -174,6 +188,27 @@ export function ErrorWebhookSection() {
 					<CaptionText className="mt-2">
 						Clear the URL to remove the endpoint. Only HTTP and HTTPS URLs are accepted.
 					</CaptionText>
+
+					<div className="mt-6 border-t border-app-line pt-5">
+						<SectionTitle as="h3" id="webhook-timezone-label" className="mb-1 text-xs">
+							Timestamp time zone
+						</SectionTitle>
+						<CaptionText id="webhook-timezone-description" className="mb-2.5">
+							The event time field is sent in this zone. The moment it records never changes, only how it
+							reads.
+						</CaptionText>
+						<SettingSelect
+							id="webhook-timezone"
+							defaultValue=""
+							value={timeZone}
+							onChange={setTimeZone}
+							options={timeZoneOptions}
+							searchLabel="Search time zones"
+						/>
+						<MonoText className="mt-2.5 block text-[10px] text-app-muted">
+							time: {zonedTimestamp(sampleRecord.timestamp, timeZone)}
+						</MonoText>
+					</div>
 
 					<div className="mt-6 flex items-start justify-between gap-4 border-t border-app-line pt-5">
 						<div>
