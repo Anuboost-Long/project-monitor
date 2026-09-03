@@ -22,6 +22,7 @@ import { parseIsoDate, toIsoDate } from "../../shared/ui/date/calendar-grid";
 import { DatePicker } from "../../shared/ui/date/DatePicker";
 import { BaseModal } from "../../shared/ui/modal/BaseModal";
 import { SyncAnimation } from "../../shared/ui/SyncAnimation";
+import { Tooltip } from "../../shared/ui/Tooltip";
 
 const MIN_WEBHOOK_SEND_DURATION = 700;
 const today = toIsoDate(new Date());
@@ -89,13 +90,18 @@ function errorWebhookFailureMessage(result: ErrorWebhookDeliveryFailure) {
 	}
 }
 
-function ActivityErrorItem({ record }: Readonly<{ record: ProjectConsoleErrorRecord }>) {
+function ActivityErrorItem({
+	record,
+	timeZone,
+}: Readonly<{ record: ProjectConsoleErrorRecord; timeZone: string }>) {
 	const [sending, setSending] = useState(false);
 	const [notice, setNotice] = useState<{ error: boolean; text: string } | null>(null);
 
 	const copy = async () => {
 		try {
-			await navigator.clipboard.writeText(JSON.stringify(createErrorWebhookBody(record), null, 2));
+			await navigator.clipboard.writeText(
+				JSON.stringify(createErrorWebhookBody(record, timeZone), null, 2),
+			);
 			setNotice({ error: false, text: "Error body copied." });
 		} catch {
 			setNotice({ error: true, text: "The error body could not be copied." });
@@ -163,25 +169,27 @@ function ActivityErrorItem({ record }: Readonly<{ record: ProjectConsoleErrorRec
 						) : null}
 					</div>
 					<div className="flex shrink-0 gap-2">
-						<button
-							type="button"
-							onClick={() => void copy()}
-							className="grid size-9 place-items-center rounded-sm border border-app-line text-app-muted transition-colors hover:border-app-accent hover:text-app-accent-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-focus"
-							aria-label={`Copy ${record.projectName} error body`}
-							title="Copy error body"
-						>
-							<ClipboardText size={15} weight="regular" aria-hidden="true" />
-						</button>
-						<button
-							type="button"
-							disabled={sending || !window.projectMonitor.sendErrorWebhook}
-							onClick={() => void send()}
-							className="grid size-9 place-items-center rounded-sm border border-app-line text-app-muted transition-colors hover:border-app-accent hover:text-app-accent-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-focus disabled:cursor-not-allowed disabled:opacity-50"
-							aria-label={`Send ${record.projectName} error to webhook`}
-							title="Send to webhook"
-						>
-							<PaperPlaneTilt size={15} weight="regular" aria-hidden="true" />
-						</button>
+						<Tooltip label="Copy error body" position="bottom-end">
+							<button
+								type="button"
+								onClick={() => void copy()}
+								className="grid size-9 place-items-center rounded-sm border border-app-line text-app-muted transition-colors hover:border-app-accent hover:text-app-accent-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-focus"
+								aria-label={`Copy ${record.projectName} error body`}
+							>
+								<ClipboardText size={15} weight="regular" aria-hidden="true" />
+							</button>
+						</Tooltip>
+						<Tooltip label="Send to webhook" position="bottom-end">
+							<button
+								type="button"
+								disabled={sending || !window.projectMonitor.sendErrorWebhook}
+								onClick={() => void send()}
+								className="grid size-9 place-items-center rounded-sm border border-app-line text-app-muted transition-colors hover:border-app-accent hover:text-app-accent-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-focus disabled:cursor-not-allowed disabled:opacity-50"
+								aria-label={`Send ${record.projectName} error to webhook`}
+							>
+								<PaperPlaneTilt size={15} weight="regular" aria-hidden="true" />
+							</button>
+						</Tooltip>
 					</div>
 				</header>
 				<pre className="mt-4 max-h-72 overflow-auto border-t border-app-line pt-4 text-[10px] leading-relaxed whitespace-pre-wrap text-app-muted">
@@ -206,6 +214,7 @@ export function ActivityRoute() {
 	const [records, setRecords] = useState<ProjectConsoleErrorRecord[]>([]);
 	const [recordsDate, setRecordsDate] = useState(today);
 	const [logDirectory, setLogDirectory] = useState("");
+	const [timeZone, setTimeZone] = useState("");
 	const [selectedDate, setSelectedDate] = useState(today);
 	const [loading, setLoading] = useState(true);
 	const [loadError, setLoadError] = useState(false);
@@ -223,7 +232,17 @@ export function ActivityRoute() {
 			}
 		};
 
+		const loadTimeZone = async () => {
+			try {
+				const settings = await api.getErrorWebhookSettings?.();
+				if (active && settings) setTimeZone(settings.timeZone);
+			} catch {
+				return;
+			}
+		};
+
 		void loadDirectory();
+		void loadTimeZone();
 		return () => {
 			active = false;
 		};
@@ -283,7 +302,7 @@ export function ActivityRoute() {
 	let content = (
 		<div className="space-y-3">
 			{visibleRecords.slice(0, 200).map((record) => (
-				<ActivityErrorItem key={record.id} record={record} />
+				<ActivityErrorItem key={record.id} record={record} timeZone={timeZone} />
 			))}
 		</div>
 	);

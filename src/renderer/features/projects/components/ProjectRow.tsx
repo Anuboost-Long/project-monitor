@@ -2,6 +2,7 @@ import { ArrowsClockwiseIcon as ArrowsClockwise, TrashIcon as Trash } from "@pho
 
 import type { SyncedProject } from "../../../../shared/project-monitor";
 import { CaptionText, MonoText, SectionTitle } from "../../../shared/typography";
+import { Tooltip } from "../../../shared/ui/Tooltip";
 
 interface ProjectRowProps {
 	index: number;
@@ -39,25 +40,27 @@ export function ProjectRow({
 				</span>
 			</div>
 			<div className="flex items-center gap-2 max-[720px]:col-start-2">
-				<button
-					type="button"
-					disabled={syncing}
-					onClick={() => onResync(project.path)}
-					className="inline-flex size-9 items-center justify-center rounded-sm border border-app-line bg-app-paper text-app-muted transition-colors hover:border-app-accent hover:text-app-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-focus disabled:cursor-not-allowed disabled:opacity-50"
-					aria-label={`Resync ${project.name}`}
-					title="Resync project"
-				>
-					<ArrowsClockwise size={15} weight="regular" aria-hidden="true" />
-				</button>
-				<button
-					type="button"
-					onClick={() => onRemove(project.path)}
-					className="inline-flex size-9 items-center justify-center rounded-sm border border-app-line bg-app-paper text-app-muted transition-colors hover:border-app-accent hover:text-app-accent-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-focus"
-					aria-label={`Remove ${project.name}`}
-					title="Remove project"
-				>
-					<Trash size={15} weight="regular" aria-hidden="true" />
-				</button>
+				<Tooltip label="Resync project" position="bottom-end">
+					<button
+						type="button"
+						disabled={syncing}
+						onClick={() => onResync(project.path)}
+						className="inline-flex size-9 items-center justify-center rounded-sm border border-app-line bg-app-paper text-app-muted transition-colors hover:border-app-accent hover:text-app-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-focus disabled:cursor-not-allowed disabled:opacity-50"
+						aria-label={`Resync ${project.name}`}
+					>
+						<ArrowsClockwise size={15} weight="regular" aria-hidden="true" />
+					</button>
+				</Tooltip>
+				<Tooltip label="Remove project" position="bottom-end">
+					<button
+						type="button"
+						onClick={() => onRemove(project.path)}
+						className="inline-flex size-9 items-center justify-center rounded-sm border border-app-line bg-app-paper text-app-muted transition-colors hover:border-app-accent hover:text-app-accent-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-focus"
+						aria-label={`Remove ${project.name}`}
+					>
+						<Trash size={15} weight="regular" aria-hidden="true" />
+					</button>
+				</Tooltip>
 			</div>
 		</article>
 	);

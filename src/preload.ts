@@ -48,6 +48,8 @@ const projectMonitor: ProjectMonitorApi = {
 		}),
 	stopProjectCommand: (runId, timeoutSeconds) =>
 		ipcRenderer.invoke("project-monitor:stop-command", runId, timeoutSeconds),
+	setProjectErrorTracking: (runId, trackErrors) =>
+		ipcRenderer.send("project-monitor:set-error-tracking", runId, trackErrors),
 	writeProjectTerminal: (runId, data) =>
 		ipcRenderer.send("project-monitor:terminal-write", runId, data),
 	resizeProjectTerminal: (runId, cols, rows) =>

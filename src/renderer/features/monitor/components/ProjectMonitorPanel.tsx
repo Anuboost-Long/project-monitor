@@ -1,12 +1,15 @@
 import {
 	ArrowsInSimpleIcon as ArrowsInSimple,
 	ArrowsOutSimpleIcon as ArrowsOutSimple,
+	EyeIcon as Eye,
+	EyeSlashIcon as EyeSlash,
 	StopIcon as Stop,
 	XIcon as X,
 } from "@phosphor-icons/react";
 import { clsx } from "clsx";
 
 import { CaptionText, MonoText, SectionTitle } from "../../../shared/typography";
+import { Tooltip } from "../../../shared/ui/Tooltip";
 import type { MonitorPanel } from "../../projects/project-context";
 import { ProjectTerminal } from "./ProjectTerminal";
 
@@ -26,6 +29,7 @@ interface ProjectMonitorPanelProps {
 	onPickSize: (runId: string) => void;
 	onRename: (runId: string) => void;
 	onStop: (runId: string) => void;
+	onTrackErrors: (runId: string, trackErrors: boolean) => void;
 	scrollback: number;
 }
 
@@ -44,6 +48,34 @@ const sizeClassName = {
 	large: "col-span-2 row-span-2 max-[720px]:col-span-1 max-[720px]:row-span-1",
 } as const;
 
+function ErrorTrackingToggle({
+	name,
+	tracking,
+	onToggle,
+}: Readonly<{ name: string; tracking: boolean; onToggle: () => void }>) {
+	return (
+		<Tooltip label={tracking ? "Watching for errors" : "Errors ignored"} position="bottom-end">
+			<button
+				type="button"
+				draggable={false}
+				aria-pressed={tracking}
+				onClick={onToggle}
+				className={clsx(
+					"grid size-8 shrink-0 place-items-center rounded-sm border text-app-muted transition-colors hover:border-app-accent hover:text-app-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-focus",
+					tracking ? "border-app-line" : "border-app-line border-dashed opacity-60",
+				)}
+				aria-label={tracking ? `Ignore errors from ${name}` : `Watch ${name} for errors`}
+			>
+				{tracking ? (
+					<Eye size={14} weight="regular" aria-hidden="true" />
+				) : (
+					<EyeSlash size={14} weight="regular" aria-hidden="true" />
+				)}
+			</button>
+		</Tooltip>
+	);
+}
+
 export function ProjectMonitorPanel({
 	panel,
 	allowSpan,
@@ -60,6 +92,7 @@ export function ProjectMonitorPanel({
 	onPickSize,
 	onRename,
 	onStop,
+	onTrackErrors,
 	scrollback,
 }: Readonly<ProjectMonitorPanelProps>) {
 	const name = panel.title ?? panel.label;
@@ -134,35 +167,42 @@ export function ProjectMonitorPanel({
 				>
 					{statusLabel[status]}
 				</MonoText>
-				<button
-					type="button"
-					draggable={false}
-					onClick={() => onPickSize(panel.id)}
-					className="grid size-8 shrink-0 place-items-center rounded-sm border border-app-line text-app-muted transition-colors hover:border-app-accent hover:text-app-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-focus"
-					aria-label={`Resize ${name}`}
-					title="Resize monitor"
-				>
-					{panel.size === "large" ? (
-						<ArrowsInSimple size={14} weight="regular" aria-hidden="true" />
-					) : (
-						<ArrowsOutSimple size={14} weight="regular" aria-hidden="true" />
-					)}
-				</button>
-				<button
-					type="button"
-					draggable={false}
-					disabled={panel.status === "stopping"}
-					onClick={() => (busy ? onStop(panel.id) : onClear(panel.id))}
-					className="grid size-8 shrink-0 place-items-center rounded-sm border border-app-line text-app-muted transition-colors hover:border-app-accent hover:text-app-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-focus disabled:cursor-wait disabled:opacity-50"
-					aria-label={busy ? `Stop ${name}` : `Close ${name}`}
-					title={busy ? "Stop command" : "Close monitor"}
-				>
-					{busy ? (
-						<Stop size={14} weight="regular" aria-hidden="true" />
-					) : (
-						<X size={14} weight="regular" aria-hidden="true" />
-					)}
-				</button>
+				<ErrorTrackingToggle
+					name={name}
+					tracking={panel.trackErrors}
+					onToggle={() => onTrackErrors(panel.id, !panel.trackErrors)}
+				/>
+				<Tooltip label="Resize monitor" position="bottom-end">
+					<button
+						type="button"
+						draggable={false}
+						onClick={() => onPickSize(panel.id)}
+						className="grid size-8 shrink-0 place-items-center rounded-sm border border-app-line text-app-muted transition-colors hover:border-app-accent hover:text-app-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-focus"
+						aria-label={`Resize ${name}`}
+					>
+						{panel.size === "large" ? (
+							<ArrowsInSimple size={14} weight="regular" aria-hidden="true" />
+						) : (
+							<ArrowsOutSimple size={14} weight="regular" aria-hidden="true" />
+						)}
+					</button>
+				</Tooltip>
+				<Tooltip label={busy ? "Stop command" : "Close monitor"} position="bottom-end">
+					<button
+						type="button"
+						draggable={false}
+						disabled={panel.status === "stopping"}
+						onClick={() => (busy ? onStop(panel.id) : onClear(panel.id))}
+						className="grid size-8 shrink-0 place-items-center rounded-sm border border-app-line text-app-muted transition-colors hover:border-app-accent hover:text-app-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-focus disabled:cursor-wait disabled:opacity-50"
+						aria-label={busy ? `Stop ${name}` : `Close ${name}`}
+					>
+						{busy ? (
+							<Stop size={14} weight="regular" aria-hidden="true" />
+						) : (
+							<X size={14} weight="regular" aria-hidden="true" />
+						)}
+					</button>
+				</Tooltip>
 			</header>
 
 			<div className="flex min-h-0 flex-1 flex-col bg-app-terminal">

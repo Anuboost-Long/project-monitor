@@ -12,6 +12,7 @@ import {
 	PageTitle,
 	SectionTitle,
 } from "../../../shared/typography";
+import { Tooltip } from "../../../shared/ui/Tooltip";
 import { useProjectMonitor } from "../../projects/project-context";
 import { EmptyMonitorPanel } from "../components/EmptyMonitorPanel";
 import { MonitorLayoutModal, type MonitorColumns } from "../components/MonitorLayoutModal";
@@ -40,6 +41,7 @@ export function MonitorPage() {
 		moveMonitor,
 		renameMonitor,
 		resizeMonitor,
+		trackMonitorErrors,
 		stopMonitor,
 		clearMonitor,
 	} = useProjectMonitor();
@@ -164,15 +166,16 @@ export function MonitorPage() {
 					</div>
 					<span className="flex items-center gap-2">
 						<MonoText className="text-app-accent-dark">{String(panels.length).padStart(2, "0")}</MonoText>
-						<button
-							type="button"
-							onClick={() => setLayoutOpen(true)}
-							className="grid size-9 place-items-center rounded-sm border border-app-line bg-app-panel text-app-muted transition-colors hover:border-app-accent hover:text-app-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-focus"
-							aria-label="Change monitor wall layout"
-							title="Monitor wall layout"
-						>
-							<GridFour size={16} weight="regular" aria-hidden="true" />
-						</button>
+						<Tooltip label="Monitor wall layout" position="bottom-end">
+							<button
+								type="button"
+								onClick={() => setLayoutOpen(true)}
+								className="grid size-9 place-items-center rounded-sm border border-app-line bg-app-panel text-app-muted transition-colors hover:border-app-accent hover:text-app-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-focus"
+								aria-label="Change monitor wall layout"
+							>
+								<GridFour size={16} weight="regular" aria-hidden="true" />
+							</button>
+						</Tooltip>
 					</span>
 				</header>
 
@@ -193,6 +196,7 @@ export function MonitorPage() {
 								dropTarget={dropSlot === slot && draggingRunId !== panel.id}
 								onStop={(runId) => void stopMonitor(runId)}
 								onClear={(runId) => void clearMonitor(runId)}
+								onTrackErrors={trackMonitorErrors}
 								onDragStart={(runId) => {
 									draggingRunIdRef.current = runId;
 									setDraggingRunId(runId);

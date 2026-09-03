@@ -42,6 +42,7 @@ const runOutputOffsets = new Map<string, number>();
 const runErrors = new Map<string, ProjectConsoleError[]>();
 const runErrorSaveTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const savedRunErrors = new Map<string, Map<string, string>>();
+const errorTrackedRuns = new Set<string>();
 const requestedStops = new Set<string>();
 const MAX_CAPTURE_LENGTH = 100_000;
 const ERROR_SAVE_DELAY = 400;
@@ -124,11 +125,25 @@ async function saveMonitorSettings(value: unknown) {
 	return monitor;
 }
 
+/** Falls back to UTC rather than rejecting, so an unknown zone never costs the rest of the config. */
+function validateWebhookTimeZone(value: unknown) {
+	if (typeof value !== "string" || !value.trim()) return "";
+
+	const timeZone = value.trim();
+	try {
+		new Intl.DateTimeFormat("en-US", { timeZone });
+	} catch {
+		return "";
+	}
+	return timeZone;
+}
+
 function validateErrorWebhookSettings(value: unknown): ErrorWebhookSettings {
 	if (typeof value !== "object" || value === null) throw new Error("Invalid webhook settings");
 
 	const url = Reflect.get(value, "url");
 	const headers = Reflect.get(value, "headers");
+	const timeZone = validateWebhookTimeZone(Reflect.get(value, "timeZone"));
 	if (typeof url !== "string" || !Array.isArray(headers)) {
 		throw new TypeError("Invalid webhook settings");
 	}
@@ -165,17 +180,17 @@ function validateErrorWebhookSettings(value: unknown): ErrorWebhookSettings {
 		return { name: trimmedName, value: headerValue };
 	});
 
-	return { url: trimmedUrl, headers: normalizedHeaders };
+	return { url: trimmedUrl, headers: normalizedHeaders, timeZone };
 }
 
 async function getErrorWebhookSettings(): Promise<ErrorWebhookSettings> {
 	const settings = await readSettings();
-	if (!settings.errorWebhook) return { url: "", headers: [] };
+	if (!settings.errorWebhook) return { url: "", headers: [], timeZone: "" };
 
 	try {
 		return validateErrorWebhookSettings(settings.errorWebhook);
 	} catch {
-		return { url: "", headers: [] };
+		return { url: "", headers: [], timeZone: "" };
 	}
 }
 
@@ -267,7 +282,7 @@ async function sendErrorWebhook(
 				...Object.fromEntries(settings.headers.map((header) => [header.name, header.value])),
 				"Content-Type": ERROR_WEBHOOK_CONTENT_TYPE,
 			},
-			data: createErrorWebhookBody(record),
+			data: createErrorWebhookBody(record, settings.timeZone),
 		});
 		return { sent: true };
 	} catch (error) {
@@ -349,6 +364,20 @@ function saveDetectedErrors(
 	for (const error of errors) saved.set(consoleErrorKey(error), error.raw);
 	savedRunErrors.set(runId, saved);
 	writeConsoleErrors(records);
+}
+
+function setErrorTracking(runId: string, trackErrors: boolean) {
+	if (trackErrors) {
+		errorTrackedRuns.add(runId);
+		return;
+	}
+
+	errorTrackedRuns.delete(runId);
+	const saveTimer = runErrorSaveTimers.get(runId);
+	if (saveTimer) clearTimeout(saveTimer);
+	runErrorSaveTimers.delete(runId);
+	runErrors.set(runId, []);
+	savedRunErrors.delete(runId);
 }
 
 function consoleErrorKey(error: ProjectConsoleError) {
@@ -680,6 +709,7 @@ export function registerProjectMonitorIpc() {
 		runErrors.clear();
 		runErrorSaveTimers.clear();
 		savedRunErrors.clear();
+		errorTrackedRuns.clear();
 	});
 
 	ipcMain.handle("project-monitor:select-project-directories", async (event) => {
@@ -753,6 +783,7 @@ export function registerProjectMonitorIpc() {
 			runOutput.set(request.runId, "");
 			runOutputOffsets.set(request.runId, 0);
 			runErrors.set(request.runId, []);
+			setErrorTracking(request.runId, request.trackErrors !== false);
 
 			const send = (runEvent: ProjectRunEvent) => {
 				if (!event.sender.isDestroyed()) {
@@ -769,6 +800,8 @@ export function registerProjectMonitorIpc() {
 					request.runId,
 					(runOutputOffsets.get(request.runId) ?? 0) + combinedOutput.length - output.length,
 				);
+				if (!errorTrackedRuns.has(request.runId)) return;
+
 				const currentErrors = runErrors.get(request.runId) ?? [];
 				const errors = mergeConsoleErrors(currentErrors, extractConsoleErrors(output));
 				if (JSON.stringify(errors) !== JSON.stringify(currentErrors)) {
@@ -789,13 +822,16 @@ export function registerProjectMonitorIpc() {
 				const stopped = requestedStops.delete(request.runId);
 				const saveTimer = runErrorSaveTimers.get(request.runId);
 				if (saveTimer) clearTimeout(saveTimer);
-				saveDetectedErrors(request.runId, project, displayCommand, runErrors.get(request.runId) ?? []);
+				if (errorTrackedRuns.has(request.runId)) {
+					saveDetectedErrors(request.runId, project, displayCommand, runErrors.get(request.runId) ?? []);
+				}
 				runs.delete(request.runId);
 				runOutput.delete(request.runId);
 				runOutputOffsets.delete(request.runId);
 				runErrors.delete(request.runId);
 				runErrorSaveTimers.delete(request.runId);
 				savedRunErrors.delete(request.runId);
+				errorTrackedRuns.delete(request.runId);
 				send({ runId: request.runId, type: "exit", exitCode });
 				if (!stopped) void showCommandExitNotification(project.name, displayCommand, exitCode);
 			});
@@ -891,6 +927,10 @@ export function registerProjectMonitorIpc() {
 					: false;
 			}),
 		);
+	});
+
+	ipcMain.on("project-monitor:set-error-tracking", (_event, runId: string, trackErrors: boolean) => {
+		if (runs.has(runId)) setErrorTracking(runId, trackErrors);
 	});
 
 	ipcMain.on("project-monitor:terminal-write", (_event, runId: string, data: string) => {

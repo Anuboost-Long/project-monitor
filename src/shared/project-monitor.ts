@@ -41,6 +41,7 @@ export interface ProjectRunRequest {
 	projectPath: string;
 	kind: ProjectRunKind;
 	value: string;
+	trackErrors: boolean;
 }
 
 export interface ProjectConsoleError {
@@ -70,6 +71,7 @@ export interface ErrorWebhookHeader {
 export interface ErrorWebhookSettings {
 	url: string;
 	headers: ErrorWebhookHeader[];
+	timeZone: string;
 }
 
 export interface ErrorWebhookDeliveryFailure {
@@ -118,6 +120,7 @@ export interface ProjectMonitorApi {
 	getActiveProjectCommands: (runIds: string[]) => Promise<string[]>;
 	getProjectCommandSnapshots?: (runIds: string[]) => Promise<ProjectRunSnapshot[]>;
 	stopProjectCommand: (runId: string, timeoutSeconds: number) => Promise<void>;
+	setProjectErrorTracking: (runId: string, trackErrors: boolean) => void;
 	writeProjectTerminal: (runId: string, data: string) => void;
 	resizeProjectTerminal: (runId: string, cols: number, rows: number) => void;
 	getMonitorSettings: () => Promise<MonitorSettings>;
@@ -133,5 +136,9 @@ export interface ProjectMonitorApi {
 	onProjectRunEvent: (callback: (event: ProjectRunEvent) => void) => () => void;
 }
 
-export { createErrorWebhookBody, ERROR_WEBHOOK_CONTENT_TYPE } from "./error-webhook";
+export {
+	createErrorWebhookBody,
+	ERROR_WEBHOOK_CONTENT_TYPE,
+	zonedTimestamp,
+} from "./error-webhook";
 export type { ErrorWebhookBody } from "./error-webhook";
