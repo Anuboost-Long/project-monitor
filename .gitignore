@@ -90,6 +90,9 @@ dist-electron/
 # electron-builder
 release/
 
+# electron-forge (legacy build output)
+out/
+
 .lazify/
 
 # Signing credentials and logs
