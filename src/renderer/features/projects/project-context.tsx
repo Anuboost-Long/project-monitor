@@ -41,6 +41,7 @@ export interface MonitorPanel {
 	outputOffset: number;
 	status: MonitorStatus;
 	exitCode: number | null;
+	trackErrors: boolean;
 	errors: ProjectConsoleError[];
 }
 
@@ -65,6 +66,7 @@ interface ProjectMonitorContextValue {
 	moveMonitor: (runId: string, slot: number) => void;
 	renameMonitor: (runId: string, title: string) => void;
 	resizeMonitor: (runId: string, size: MonitorPanelSize) => void;
+	trackMonitorErrors: (runId: string, trackErrors: boolean) => void;
 	stopMonitor: (runId: string) => Promise<void>;
 	clearMonitor: (runId: string) => Promise<void>;
 }
@@ -102,6 +104,7 @@ function readStoredPanels(): StoredPanelSession {
 				.map((panel) => ({
 					...panel,
 					projectPath: typeof panel.projectPath === "string" ? panel.projectPath : panel.projectId,
+					trackErrors: panel.trackErrors !== false,
 				})),
 		};
 	} catch {
@@ -155,6 +158,7 @@ function panelRunRequest(panel: MonitorPanel): ProjectRunRequest {
 		projectPath: panel.projectPath,
 		kind: panel.kind,
 		value: panel.kind === "script" ? panel.label : "",
+		trackErrors: panel.trackErrors,
 	};
 }
 
@@ -457,6 +461,7 @@ export function ProjectMonitorProvider({ children }: Readonly<{ children: ReactN
 				outputOffset: 0,
 				status: "running",
 				exitCode: null,
+				trackErrors: true,
 				errors: [],
 			};
 			const next = [panel, ...current];
@@ -470,6 +475,7 @@ export function ProjectMonitorProvider({ children }: Readonly<{ children: ReactN
 				projectPath: project.path,
 				kind,
 				value,
+				trackErrors: true,
 			});
 		} catch (error) {
 			const message = error instanceof Error ? error.message : "The terminal could not start.";
@@ -518,6 +524,15 @@ export function ProjectMonitorProvider({ children }: Readonly<{ children: ReactN
 		);
 	};
 
+	const trackMonitorErrors = (runId: string, trackErrors: boolean) => {
+		window.projectMonitor.setProjectErrorTracking(runId, trackErrors);
+		setPanels((current) =>
+			current.map((panel) =>
+				panel.id === runId ? { ...panel, trackErrors, errors: trackErrors ? panel.errors : [] } : panel,
+			),
+		);
+	};
+
 	const resizeMonitor = (runId: string, size: MonitorPanelSize) => {
 		setPanels((current) => current.map((panel) => (panel.id === runId ? { ...panel, size } : panel)));
 	};
@@ -548,6 +563,7 @@ export function ProjectMonitorProvider({ children }: Readonly<{ children: ReactN
 			moveMonitor,
 			renameMonitor,
 			resizeMonitor,
+			trackMonitorErrors,
 			stopMonitor,
 			clearMonitor,
 		}),
@@ -565,6 +581,7 @@ export function ProjectMonitorProvider({ children }: Readonly<{ children: ReactN
 			moveMonitor,
 			renameMonitor,
 			resizeMonitor,
+			trackMonitorErrors,
 			stopMonitor,
 			clearMonitor,
 		],

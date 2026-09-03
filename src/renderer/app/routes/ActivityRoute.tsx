@@ -22,6 +22,7 @@ import { parseIsoDate, toIsoDate } from "../../shared/ui/date/calendar-grid";
 import { DatePicker } from "../../shared/ui/date/DatePicker";
 import { BaseModal } from "../../shared/ui/modal/BaseModal";
 import { SyncAnimation } from "../../shared/ui/SyncAnimation";
+import { Tooltip } from "../../shared/ui/Tooltip";
 
 const MIN_WEBHOOK_SEND_DURATION = 700;
 const today = toIsoDate(new Date());
@@ -163,25 +164,27 @@ function ActivityErrorItem({ record }: Readonly<{ record: ProjectConsoleErrorRec
 						) : null}
 					</div>
 					<div className="flex shrink-0 gap-2">
-						<button
-							type="button"
-							onClick={() => void copy()}
-							className="grid size-9 place-items-center rounded-sm border border-app-line text-app-muted transition-colors hover:border-app-accent hover:text-app-accent-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-focus"
-							aria-label={`Copy ${record.projectName} error body`}
-							title="Copy error body"
-						>
-							<ClipboardText size={15} weight="regular" aria-hidden="true" />
-						</button>
-						<button
-							type="button"
-							disabled={sending || !window.projectMonitor.sendErrorWebhook}
-							onClick={() => void send()}
-							className="grid size-9 place-items-center rounded-sm border border-app-line text-app-muted transition-colors hover:border-app-accent hover:text-app-accent-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-focus disabled:cursor-not-allowed disabled:opacity-50"
-							aria-label={`Send ${record.projectName} error to webhook`}
-							title="Send to webhook"
-						>
-							<PaperPlaneTilt size={15} weight="regular" aria-hidden="true" />
-						</button>
+						<Tooltip label="Copy error body" position="bottom-end">
+							<button
+								type="button"
+								onClick={() => void copy()}
+								className="grid size-9 place-items-center rounded-sm border border-app-line text-app-muted transition-colors hover:border-app-accent hover:text-app-accent-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-focus"
+								aria-label={`Copy ${record.projectName} error body`}
+							>
+								<ClipboardText size={15} weight="regular" aria-hidden="true" />
+							</button>
+						</Tooltip>
+						<Tooltip label="Send to webhook" position="bottom-end">
+							<button
+								type="button"
+								disabled={sending || !window.projectMonitor.sendErrorWebhook}
+								onClick={() => void send()}
+								className="grid size-9 place-items-center rounded-sm border border-app-line text-app-muted transition-colors hover:border-app-accent hover:text-app-accent-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-focus disabled:cursor-not-allowed disabled:opacity-50"
+								aria-label={`Send ${record.projectName} error to webhook`}
+							>
+								<PaperPlaneTilt size={15} weight="regular" aria-hidden="true" />
+							</button>
+						</Tooltip>
 					</div>
 				</header>
 				<pre className="mt-4 max-h-72 overflow-auto border-t border-app-line pt-4 text-[10px] leading-relaxed whitespace-pre-wrap text-app-muted">

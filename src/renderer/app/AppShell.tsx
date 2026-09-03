@@ -6,6 +6,7 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import markDark from "../../../assets/icons/mark-dark.png";
 import markLight from "../../../assets/icons/mark-light.png";
 import { CaptionText, OverlineText, SectionTitle } from "../shared/typography";
+import { Tooltip } from "../shared/ui/Tooltip";
 import { appPages, settingsPage } from "./app-navigation";
 import { useAppTheme } from "./app-theme";
 import { AppNavigation } from "./components/AppNavigation";
@@ -43,21 +44,22 @@ export function AppShell() {
 						sidebarOpen ? "gap-3 p-4.5" : "justify-center p-3",
 					)}
 				>
-					<button
-						type="button"
-						onClick={() => {
-							if (!sidebarOpen) setSidebarOpen(true);
-						}}
-						className="grid size-9.5 shrink-0 place-items-center overflow-hidden rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-focus"
-						aria-label={sidebarOpen ? undefined : "Expand sidebar"}
-						title={sidebarOpen ? undefined : "Expand sidebar"}
-					>
-						<img
-							src={theme === "default" ? markDark : markLight}
-							alt="Project Monitor"
-							className="size-full"
-						/>
-					</button>
+					<Tooltip label={sidebarOpen ? undefined : "Expand sidebar"} position="right">
+						<button
+							type="button"
+							onClick={() => {
+								if (!sidebarOpen) setSidebarOpen(true);
+							}}
+							className="grid size-9.5 shrink-0 place-items-center overflow-hidden rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-focus"
+							aria-label={sidebarOpen ? undefined : "Expand sidebar"}
+						>
+							<img
+								src={theme === "default" ? markDark : markLight}
+								alt="Project Monitor"
+								className="size-full"
+							/>
+						</button>
+					</Tooltip>
 					{sidebarOpen ? (
 						<span className="min-w-0 flex-1">
 							<SectionTitle as="strong" className="block text-[13px] tracking-[0.015em] text-inherit">
@@ -73,15 +75,20 @@ export function AppShell() {
 					) : null}
 				</header>
 				{sidebarOpen ? (
-					<button
-						type="button"
-						onClick={() => setSidebarOpen(false)}
-						className="absolute top-7.5 right-0 z-10 grid size-7 translate-x-1/2 place-items-center rounded-full border border-app-sidebar-line bg-app-sidebar text-app-sidebar-muted transition-colors hover:border-app-accent hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-focus"
-						aria-label="Collapse sidebar"
-						title="Collapse sidebar"
+					<Tooltip
+						label="Collapse sidebar"
+						position="right"
+						className="absolute top-7.5 right-0 z-10 translate-x-1/2"
 					>
-						<CaretLeft size={13} weight="bold" aria-hidden="true" />
-					</button>
+						<button
+							type="button"
+							onClick={() => setSidebarOpen(false)}
+							className="grid size-7 place-items-center rounded-full border border-app-sidebar-line bg-app-sidebar text-app-sidebar-muted transition-colors hover:border-app-accent hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-focus"
+							aria-label="Collapse sidebar"
+						>
+							<CaretLeft size={13} weight="bold" aria-hidden="true" />
+						</button>
+					</Tooltip>
 				) : null}
 
 				<AppNavigation collapsed={!sidebarOpen} pages={appPages} />
@@ -103,24 +110,25 @@ export function AppShell() {
 							</OverlineText>
 						</span>
 					) : null}
-					<NavLink
-						to={settingsPage.path}
-						className={({ isActive }) =>
-							clsx(
-								"grid size-9 shrink-0 place-items-center rounded-md border border-app-sidebar-line",
-								"text-app-sidebar-muted transition-colors duration-150",
-								"hover:border-app-accent hover:bg-app-sidebar-hover hover:text-white",
-								"focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-focus",
-								isActive && "border-app-accent bg-app-sidebar-active text-white",
-							)
-						}
-						aria-label="Settings"
-						title="Settings"
-					>
-						{({ isActive }) => (
-							<GearSix size={16} weight={isActive ? "fill" : "regular"} aria-hidden="true" />
-						)}
-					</NavLink>
+					<Tooltip label="Settings" position="right">
+						<NavLink
+							to={settingsPage.path}
+							className={({ isActive }) =>
+								clsx(
+									"grid size-9 shrink-0 place-items-center rounded-md border border-app-sidebar-line",
+									"text-app-sidebar-muted transition-colors duration-150",
+									"hover:border-app-accent hover:bg-app-sidebar-hover hover:text-white",
+									"focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-focus",
+									isActive && "border-app-accent bg-app-sidebar-active text-white",
+								)
+							}
+							aria-label="Settings"
+						>
+							{({ isActive }) => (
+								<GearSix size={16} weight={isActive ? "fill" : "regular"} aria-hidden="true" />
+							)}
+						</NavLink>
+					</Tooltip>
 				</footer>
 			</aside>
 
